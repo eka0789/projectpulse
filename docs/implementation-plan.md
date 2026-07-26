@@ -1,5 +1,10 @@
 # ProjectPulse Implementation Plan
 
+> Progress snapshot (2026-07-26): checkboxes below reflect verified repository
+> evidence. A feature is not marked complete solely because a route or document
+> exists. Current verified vertical slice: Sanctum login, protected admin shell,
+> and live dashboard summary. CRUD web screens and the mobile app remain pending.
+
 ## 1. Requirement Checklist
 
 ### Role & Access Control
@@ -34,15 +39,17 @@
 - [x] Idempotent H-1 upcoming task deadline notification command (`SendUpcomingTaskDeadlineNotifications`).
 
 ### Frontend Apps
-- [x] Web Admin (Next.js / App Router / React / Tailwind / Lucide / TanStack Query): Dashboard, Client CRUD, Project Wizard with AI review, Task Management, Kanban with optimistic updates & rollback.
-- [x] Mobile Member App (Ionic React / Capacitor / Tailwind): Login, My Tasks, Task Detail, Status Update, Time Log, History, Notifications.
+- [x] Web foundation: Next.js App Router, strict TypeScript, Tailwind, reusable UI primitives, TanStack Query, Axios, RHF/Zod, responsive protected shell.
+- [x] Web authentication and dashboard: real Laravel API login/logout/me, centralized bearer token and 401 handling, live dashboard metrics/chart/workload/recent projects, loading/error/empty states.
+- [ ] Web management: Client CRUD, Project CRUD, AI review wizard, Task CRUD, Kanban, members, reports, and notifications.
+- [ ] Mobile Member App: Ionic React / Capacitor login, My Tasks, Task Detail, Status Update, Time Log, History, and Notifications.
 
 ### DevOps & Infrastructure
-- [x] Dockerfiles for Backend & Web Admin.
-- [x] `docker-compose.yml` orchestrating PostgreSQL, Backend, Web Admin, Queue, Scheduler.
-- [x] Kubernetes manifests (`k8s/`): Namespace, ConfigMap, Secret example, PostgreSQL StatefulSet, Backend Deployment & Service, Web Deployment & Service, Ingress, Migration Job, HPA.
-- [x] CI Workflow (`.github/workflows/ci.yml`).
-- [x] Postman Collection & Environment (`postman/`).
+- [x] Dockerfiles for Backend & Web Admin (web uses a non-root standalone Next.js runtime).
+- [ ] `docker-compose.yml` defines PostgreSQL, Backend, Web Admin, Queue, and Scheduler, but runtime validation is pending because Docker is not installed in the current environment.
+- [ ] Kubernetes manifests: present only in part and still require PostgreSQL StatefulSet, migration Job, HPA, resource limits, and end-to-end validation.
+- [ ] CI Workflow: not yet verified.
+- [ ] Postman Collection & Environment: not yet verified.
 
 ---
 
