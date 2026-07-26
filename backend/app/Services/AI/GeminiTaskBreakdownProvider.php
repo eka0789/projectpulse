@@ -2,141 +2,171 @@
 
 namespace App\Services\AI;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class GeminiTaskBreakdownProvider implements TaskBreakdownProviderInterface
 {
+    public function __construct(
+        private readonly TaskBreakdownNormalizer $normalizer
+    ) {}
+
     public function generate(TaskBreakdownRequestData $request): TaskBreakdownResult
     {
-        $startTime = microtime(true);
-        $apiKey = config('services.ai.gemini.api_key', env('AI_API_KEY'));
-        $model = config('services.ai.gemini.model', env('AI_MODEL', 'gemini-1.5-flash'));
-        $timeout = (int) env('AI_TIMEOUT_SECONDS', 20);
+        $startedAt = microtime(true);
+        $apiKey = config('services.ai.gemini.api_key');
+        $model = (string) config('services.ai.gemini.model');
 
-        if (env('AI_DEMO_FALLBACK_ENABLED', false) && empty($apiKey)) {
-            return $this->getDemoFallbackResult($startTime, 'gemini', $model);
-        }
+        Log::info('AI task generation started', [
+            'provider' => 'gemini',
+            'model' => $model,
+            'brief_hash' => hash('sha256', $request->brief),
+        ]);
 
-        if (empty($apiKey)) {
-            $latencyMs = (int) ((microtime(true) - $startTime) * 1000);
-            return new TaskBreakdownResult(
-                success: false,
-                provider: 'gemini',
-                model: $model,
-                latencyMs: $latencyMs,
-                errorCode: 'AI_PROVIDER_UNAVAILABLE',
-                errorMessage: 'Gemini API key is not configured.'
-            );
+        if (blank($apiKey)) {
+            return config('services.ai.demo_fallback_enabled')
+                ? $this->demoResult($request, $startedAt, $model)
+                : $this->failure(
+                    $startedAt,
+                    $model,
+                    'AI_PROVIDER_UNAVAILABLE',
+                    'The AI provider is not configured.'
+                );
         }
 
         try {
-            $prompt = $this->buildPrompt($request->brief, $request->preferences);
-            $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
-
-            $response = Http::timeout($timeout)->post($url, [
-                'contents' => [
+            $response = Http::acceptJson()
+                ->withQueryParameters(['key' => $apiKey])
+                ->timeout((int) config('services.ai.timeout_seconds'))
+                ->retry(2, 250, throw: false)
+                ->post(
+                    "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent",
                     [
-                        'parts' => [
-                            ['text' => $prompt]
-                        ]
+                        'contents' => [[
+                            'parts' => [['text' => $this->buildPrompt($request)]],
+                        ]],
+                        'generationConfig' => [
+                            'responseMimeType' => 'application/json',
+                            'temperature' => 0.3,
+                        ],
                     ]
-                ],
-                'generationConfig' => [
-                    'responseMimeType' => 'application/json',
-                    'temperature' => 0.7,
-                ]
-            ]);
-
-            $latencyMs = (int) ((microtime(true) - $startTime) * 1000);
+                );
 
             if ($response->failed()) {
-                Log::warning('Gemini task breakdown failed', [
+                Log::warning('AI provider request failed', [
+                    'provider' => 'gemini',
                     'status' => $response->status(),
-                    'error' => $response->body(),
                 ]);
 
-                if (env('AI_DEMO_FALLBACK_ENABLED', false)) {
-                    return $this->getDemoFallbackResult($startTime, 'gemini', $model);
-                }
+                return config('services.ai.demo_fallback_enabled')
+                    ? $this->demoResult($request, $startedAt, $model)
+                    : $this->failure(
+                        $startedAt,
+                        $model,
+                        'AI_PROVIDER_UNAVAILABLE',
+                        'The AI provider is temporarily unavailable.'
+                    );
+            }
 
-                return new TaskBreakdownResult(
-                    success: false,
-                    provider: 'gemini',
-                    model: $model,
-                    latencyMs: $latencyMs,
-                    errorCode: 'AI_PROVIDER_UNAVAILABLE',
-                    errorMessage: 'Gemini request failed: ' . $response->status()
+            $content = $response->json('candidates.0.content.parts.0.text');
+            $parsed = is_string($content) ? json_decode($content, true) : null;
+            $tasks = is_array($parsed)
+                ? $this->normalizer->normalize(
+                    is_array($parsed['tasks'] ?? null) ? $parsed['tasks'] : [],
+                    $request->maximumTasks()
+                )
+                : [];
+
+            if ($tasks === []) {
+                return $this->failure(
+                    $startedAt,
+                    $model,
+                    'AI_INVALID_RESPONSE',
+                    'The AI provider returned an invalid task list.'
                 );
             }
 
-            $body = $response->json();
-            $content = $body['candidates'][0]['content']['parts'][0]['text'] ?? '{}';
-            $parsed = json_decode($content, true);
-
-            $rawTasks = $parsed['tasks'] ?? [];
-            $normalizedTasks = (new OpenAITaskBreakdownProvider())->normalizeTasks($rawTasks);
-
             return new TaskBreakdownResult(
                 success: true,
-                tasks: $normalizedTasks,
+                tasks: $tasks,
                 provider: 'gemini',
                 model: $model,
-                latencyMs: $latencyMs
+                latencyMs: $this->latency($startedAt)
             );
-        } catch (\Throwable $e) {
-            $latencyMs = (int) ((microtime(true) - $startTime) * 1000);
-            Log::error('Gemini exception', ['exception' => $e->getMessage()]);
+        } catch (ConnectionException) {
+            return $this->failure(
+                $startedAt,
+                $model,
+                'AI_REQUEST_TIMEOUT',
+                'The AI request timed out.'
+            );
+        } catch (\Throwable $exception) {
+            Log::error('Unexpected AI provider exception', [
+                'provider' => 'gemini',
+                'exception_class' => $exception::class,
+            ]);
 
-            if (env('AI_DEMO_FALLBACK_ENABLED', false)) {
-                return $this->getDemoFallbackResult($startTime, 'gemini', $model);
-            }
-
-            return new TaskBreakdownResult(
-                success: false,
-                provider: 'gemini',
-                model: $model,
-                latencyMs: $latencyMs,
-                errorCode: 'AI_REQUEST_TIMEOUT',
-                errorMessage: $e->getMessage()
+            return $this->failure(
+                $startedAt,
+                $model,
+                'AI_PROVIDER_UNAVAILABLE',
+                'The AI provider is temporarily unavailable.'
             );
         }
     }
 
-    private function buildPrompt(string $brief, array $preferences): string
+    private function buildPrompt(TaskBreakdownRequestData $request): string
     {
-        $maxTasks = $preferences['maximum_tasks'] ?? 15;
-        return <<<PROMPT
-Given the following client brief:
-"{$brief}"
+        $preferences = json_encode($request->preferences, JSON_THROW_ON_ERROR);
 
-Generate a list of up to {$maxTasks} software development tasks.
-Respond with JSON format strictly matching this structure:
-{
-  "tasks": [
-    {
-      "title": "Short descriptive title",
-      "description": "Detailed implementation note",
-      "category": "frontend|backend|design|qa|devops|management|other",
-      "estimated_hours": 8.0,
-      "priority": "low|medium|high|urgent",
-      "acceptance_criteria": ["Criterion 1", "Criterion 2"]
-    }
-  ]
-}
+        return <<<PROMPT
+Client brief:
+{$request->brief}
+
+Preferences: {$preferences}
+Return JSON with a tasks array containing at most {$request->maximumTasks()} tasks.
+Each task must have title, description, category, estimated_hours, priority,
+and acceptance_criteria.
 PROMPT;
     }
 
-    private function getDemoFallbackResult(float $startTime, string $provider, string $model): TaskBreakdownResult
-    {
-        $latencyMs = (int) ((microtime(true) - $startTime) * 1000);
+    private function demoResult(
+        TaskBreakdownRequestData $request,
+        float $startedAt,
+        string $model
+    ): TaskBreakdownResult {
         return new TaskBreakdownResult(
             success: true,
-            tasks: (new OpenAITaskBreakdownProvider())->getDemoFallbackResult($startTime, $provider, $model)->tasks,
-            provider: $provider,
+            tasks: $this->normalizer->normalize(
+                $this->normalizer->demoTasks(),
+                $request->maximumTasks()
+            ),
+            provider: 'gemini',
             model: $model,
-            latencyMs: $latencyMs,
+            latencyMs: $this->latency($startedAt),
             source: 'demo_fallback'
         );
+    }
+
+    private function failure(
+        float $startedAt,
+        string $model,
+        string $code,
+        string $message
+    ): TaskBreakdownResult {
+        return new TaskBreakdownResult(
+            success: false,
+            provider: 'gemini',
+            model: $model,
+            latencyMs: $this->latency($startedAt),
+            errorCode: $code,
+            errorMessage: $message
+        );
+    }
+
+    private function latency(float $startedAt): int
+    {
+        return (int) ((microtime(true) - $startedAt) * 1000);
     }
 }

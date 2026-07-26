@@ -2,12 +2,18 @@
 
 import {
   Bell,
+  BriefcaseBusiness,
   ChevronDown,
   CircleGauge,
+  Clock3,
+  FolderKanban,
+  LayoutList,
   LogOut,
   Menu,
+  Users,
   X,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -15,9 +21,15 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth-provider";
 import { cn } from "@/lib/utils";
+import { notificationsApi } from "@/services/resource-service";
 
 const navigation = [
   { label: "Overview", href: "/dashboard", icon: CircleGauge },
+  { label: "Projects", href: "/projects", icon: FolderKanban },
+  { label: "Tasks", href: "/tasks", icon: LayoutList },
+  { label: "Clients", href: "/clients", icon: BriefcaseBusiness },
+  { label: "Team", href: "/members", icon: Users },
+  { label: "Time reports", href: "/reports", icon: Clock3 },
 ];
 
 function Brand() {
@@ -47,6 +59,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const unread = useQuery({
+    queryKey: ["notifications", "unread"],
+    queryFn: notificationsApi.unreadCount,
+    refetchInterval: 60_000,
+  });
 
   async function handleLogout() {
     setIsLoggingOut(true);
@@ -167,9 +184,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </p>
             </div>
           </div>
-          <Button variant="ghost" size="icon" aria-label="Notifications">
+          <Link
+            href="/notifications"
+            className="relative grid size-11 place-items-center rounded-xl text-slate-600 outline-none transition hover:bg-slate-100 hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-blue-600"
+            aria-label={`${unread.data ?? 0} unread notifications`}
+          >
             <Bell className="size-5" />
-          </Button>
+            {unread.data ? (
+              <span className="absolute right-1.5 top-1.5 min-w-4 rounded-full bg-red-600 px-1 text-center text-[10px] font-bold leading-4 text-white">
+                {unread.data > 9 ? "9+" : unread.data}
+              </span>
+            ) : null}
+          </Link>
         </header>
         <main className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
       </div>

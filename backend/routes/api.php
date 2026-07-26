@@ -25,38 +25,38 @@ Route::get('/health', [HealthController::class, 'liveness']);
 Route::get('/health/ready', [HealthController::class, 'readiness']);
 
 // Authentication
-Route::post('/auth/login', [AuthController::class, 'login']);
-Route::post('/auth/register', [AuthController::class, 'register']);
+Route::middleware('throttle:5,1')->group(function () {
+    Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::post('/auth/register', [AuthController::class, 'register']);
+});
 
 // Protected API Routes
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function () {
     // Auth & Profile
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
 
-    // Dashboard
-    Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
+    Route::middleware('admin')->group(function () {
+        Route::get('/dashboard/summary', [DashboardController::class, 'summary']);
+        Route::apiResource('members', MemberController::class);
+        Route::apiResource('clients', ClientController::class);
+        Route::apiResource('projects', ProjectController::class);
 
-    // Members (Admin Only)
-    Route::apiResource('members', MemberController::class);
+        Route::get('/projects/{project}/tasks', [TaskController::class, 'index']);
+        Route::post('/projects/{project}/tasks', [TaskController::class, 'store']);
+        Route::post('/projects/{project}/tasks/generate', [TaskController::class, 'generateAISuggestions']);
+        Route::post('/projects/{project}/tasks/bulk', [TaskController::class, 'bulkStore']);
 
-    // Clients (Admin Only)
-    Route::apiResource('clients', ClientController::class);
+        Route::patch('/tasks/{id}', [TaskController::class, 'update']);
+        Route::delete('/tasks/{id}', [TaskController::class, 'destroy']);
 
-    // Projects
-    Route::apiResource('projects', ProjectController::class);
+        Route::get('/reports/time-logs', [ReportController::class, 'timeLogs']);
+        Route::get('/reports/time-logs/export.csv', [ReportController::class, 'exportCsv']);
+    });
 
-    // AI Task Breakdown & Bulk Task Insert
-    Route::post('/projects/{project}/tasks/generate', [TaskController::class, 'generateAISuggestions']);
-    Route::post('/projects/{project}/tasks/bulk', [TaskController::class, 'bulkStore']);
-
-    // Tasks & Nested Tasks
-    Route::get('/projects/{project}/tasks', [TaskController::class, 'index']);
-    Route::post('/projects/{project}/tasks', [TaskController::class, 'store']);
+    // Tasks are scoped by TaskController for member accounts.
     Route::get('/tasks', [TaskController::class, 'index']);
     Route::get('/tasks/{id}', [TaskController::class, 'show']);
-    Route::patch('/tasks/{id}', [TaskController::class, 'update']);
-    Route::delete('/tasks/{id}', [TaskController::class, 'destroy']);
     Route::patch('/tasks/{id}/status', [TaskController::class, 'updateStatus']);
 
     // Time Logs
@@ -68,10 +68,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // Progress Notes
     Route::get('/tasks/{task}/progress-notes', [ProgressNoteController::class, 'index']);
     Route::post('/tasks/{task}/progress-notes', [ProgressNoteController::class, 'store']);
+    Route::patch('/progress-notes/{id}', [ProgressNoteController::class, 'update']);
+    Route::delete('/progress-notes/{id}', [ProgressNoteController::class, 'destroy']);
 
     // Comments
     Route::get('/tasks/{task}/comments', [CommentController::class, 'index']);
     Route::post('/tasks/{task}/comments', [CommentController::class, 'store']);
+    Route::patch('/comments/{id}', [CommentController::class, 'update']);
+    Route::delete('/comments/{id}', [CommentController::class, 'destroy']);
 
     // Notifications
     Route::get('/notifications', [NotificationController::class, 'index']);
@@ -79,7 +83,4 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead']);
 
-    // Reports
-    Route::get('/reports/time-logs', [ReportController::class, 'timeLogs']);
-    Route::get('/reports/time-logs/export.csv', [ReportController::class, 'exportCsv']);
 });

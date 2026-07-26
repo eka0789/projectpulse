@@ -2,30 +2,53 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: projectpulse-web
+  namespace: projectpulse
   labels:
-    app: projectpulse-web
+    app.kubernetes.io/name: projectpulse-web
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
-      app: projectpulse-web
+      app.kubernetes.io/name: projectpulse-web
   template:
     metadata:
       labels:
-        app: projectpulse-web
+        app.kubernetes.io/name: projectpulse-web
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
       containers:
         - name: web
-          # TODO: ganti dengan image hasil `docker build` kamu, mis. ghcr.io/<org>/projectpulse-web:latest
           image: projectpulse-web:latest
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 3000
-          env:
-            - name: NEXT_PUBLIC_API_URL
-              value: "http://projectpulse-backend:8000"
+            - name: http
+              containerPort: 3000
           readinessProbe:
             httpGet:
-              path: /
-              port: 3000
-            initialDelaySeconds: 5
+              path: /login
+              port: http
+            initialDelaySeconds: 8
             periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /login
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 384Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]

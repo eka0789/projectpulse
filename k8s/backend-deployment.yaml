@@ -2,24 +2,31 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: projectpulse-backend
+  namespace: projectpulse
   labels:
-    app: projectpulse-backend
+    app.kubernetes.io/name: projectpulse-backend
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
-      app: projectpulse-backend
+      app.kubernetes.io/name: projectpulse-backend
   template:
     metadata:
       labels:
-        app: projectpulse-backend
+        app.kubernetes.io/name: projectpulse-backend
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
       containers:
         - name: backend
-          # TODO: ganti dengan image hasil `docker build` kamu, mis. ghcr.io/<org>/projectpulse-backend:latest
           image: projectpulse-backend:latest
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8000
+            - name: http
+              containerPort: 8000
           envFrom:
             - configMapRef:
                 name: projectpulse-config
@@ -27,13 +34,27 @@ spec:
                 name: projectpulse-secret
           readinessProbe:
             httpGet:
-              path: /health
-              port: 8000
-            initialDelaySeconds: 5
+              path: /api/health/ready
+              port: http
+            initialDelaySeconds: 8
             periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
           livenessProbe:
             httpGet:
-              path: /health
-              port: 8000
-            initialDelaySeconds: 10
+              path: /api/health
+              port: http
+            initialDelaySeconds: 15
             periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]

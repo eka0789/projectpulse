@@ -1,0 +1,126 @@
+{
+  "info": {
+    "_postman_id": "df175cf8-17aa-4808-ada6-08536725fb7c",
+    "name": "ProjectPulse API",
+    "description": "Core ProjectPulse workflow requests. The complete machine-readable contract is docs/openapi.yaml.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Readiness",
+          "request": { "auth": { "type": "noauth" }, "method": "GET", "url": "{{base_url}}/health/ready" }
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Admin login",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('login succeeds', () => pm.response.to.have.status(200));",
+                "const body = pm.response.json();",
+                "if (body.data && body.data.token) pm.environment.set('token', body.data.token);"
+              ],
+              "type": "text/javascript"
+            }
+          }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"email\":\"admin@projectpulse.test\",\"password\":\"password\"}" },
+            "url": "{{base_url}}/auth/login"
+          }
+        },
+        {
+          "name": "Current user",
+          "request": { "method": "GET", "url": "{{base_url}}/auth/me" }
+        },
+        {
+          "name": "Logout",
+          "request": { "method": "POST", "url": "{{base_url}}/auth/logout" }
+        }
+      ]
+    },
+    {
+      "name": "Admin resources",
+      "item": [
+        { "name": "Dashboard", "request": { "method": "GET", "url": "{{base_url}}/dashboard/summary" } },
+        { "name": "List clients", "request": { "method": "GET", "url": "{{base_url}}/clients?per_page=15" } },
+        { "name": "List projects", "request": { "method": "GET", "url": "{{base_url}}/projects?per_page=15" } },
+        { "name": "List members", "request": { "method": "GET", "url": "{{base_url}}/members?per_page=100" } },
+        {
+          "name": "Create task",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"title\":\"Review production checklist\",\"description\":\"Verify release acceptance criteria.\",\"category\":\"qa\",\"priority\":\"high\",\"status\":\"todo\",\"source\":\"manual\"}"
+            },
+            "url": "{{base_url}}/projects/{{project_id}}/tasks"
+          }
+        },
+        {
+          "name": "Generate AI suggestions",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"brief\":\"Build a responsive commerce portal with product discovery, checkout, payments, deployment, and automated acceptance testing.\",\"preferences\":{\"include_qa\":true,\"include_devops\":true,\"maximum_tasks\":10}}"
+            },
+            "url": "{{base_url}}/projects/{{project_id}}/tasks/generate"
+          }
+        },
+        { "name": "Time report", "request": { "method": "GET", "url": "{{base_url}}/reports/time-logs" } }
+      ]
+    },
+    {
+      "name": "Member workflow",
+      "item": [
+        { "name": "My tasks", "request": { "method": "GET", "url": "{{base_url}}/tasks?status=in_progress" } },
+        { "name": "Task detail", "request": { "method": "GET", "url": "{{base_url}}/tasks/{{task_id}}" } },
+        {
+          "name": "Update status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"status\":\"review\"}" },
+            "url": "{{base_url}}/tasks/{{task_id}}/status"
+          }
+        },
+        {
+          "name": "Add progress note",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"note\":\"Implementation complete and ready for review.\"}" },
+            "url": "{{base_url}}/tasks/{{task_id}}/progress-notes"
+          }
+        },
+        {
+          "name": "Log time",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"work_date\":\"2026-07-26\",\"duration_minutes\":90,\"note\":\"Completed implementation and tests.\"}" },
+            "url": "{{base_url}}/tasks/{{task_id}}/time-logs"
+          }
+        },
+        { "name": "Notifications", "request": { "method": "GET", "url": "{{base_url}}/notifications" } }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: projectpulse-queue
+  namespace: projectpulse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: projectpulse-queue
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: projectpulse-queue
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+      containers:
+        - name: queue
+          image: projectpulse-backend:latest
+          imagePullPolicy: IfNotPresent
+          command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=3", "--timeout=90"]
+          envFrom:
+            - configMapRef:
+                name: projectpulse-config
+            - secretRef:
+                name: projectpulse-secret
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: projectpulse-scheduler
+  namespace: projectpulse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: projectpulse-scheduler
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: projectpulse-scheduler
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+      containers:
+        - name: scheduler
+          image: projectpulse-backend:latest
+          imagePullPolicy: IfNotPresent
+          command: ["php", "artisan", "schedule:work"]
+          envFrom:
+            - configMapRef:
+                name: projectpulse-config
+            - secretRef:
+                name: projectpulse-secret
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 192Mi

@@ -3,9 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Project\StoreProjectRequest;
+use App\Http\Requests\Project\UpdateProjectRequest;
+use App\Http\Resources\ProjectResource;
 use App\Models\Project;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ProjectController extends Controller
 {
@@ -41,43 +45,40 @@ class ProjectController extends Controller
             $query->where('deadline', '<=', $request->deadline_to);
         }
 
-        $projects = $query->orderBy('created_at', 'desc')->paginate($request->get('per_page', 15));
+        $sort = in_array($request->string('sort')->toString(), ['name', 'status', 'deadline', 'created_at'], true)
+            ? $request->string('sort')->toString()
+            : 'created_at';
+        $direction = in_array($request->string('direction')->lower()->toString(), ['asc', 'desc'], true)
+            ? $request->string('direction')->lower()->toString()
+            : 'desc';
+        $perPage = max(1, min($request->integer('per_page', 15), 100));
+        $projects = $query->orderBy($sort, $direction)->paginate($perPage);
 
         return response()->json([
             'success' => true,
             'message' => 'Projects retrieved successfully.',
-            'data' => $projects->items(),
+            'data' => ProjectResource::collection($projects->getCollection()),
             'meta' => [
                 'current_page' => $projects->currentPage(),
                 'per_page' => $projects->perPage(),
                 'total' => $projects->total(),
                 'last_page' => $projects->lastPage(),
-            ]
+            ],
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreProjectRequest $request): JsonResponse
     {
-        if (!$request->user()->isAdmin()) {
+        if (! $request->user()->isAdmin()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized action.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
 
-        $request->validate([
-            'client_id' => 'required|exists:clients,id',
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'client_brief' => 'nullable|string',
-            'start_date' => 'nullable|date',
-            'deadline' => 'required|date|after_or_equal:start_date',
-            'status' => 'required|in:draft,active,on_hold,completed,cancelled',
-        ]);
-
         $project = Project::create([
-            ...$request->only(['client_id', 'name', 'description', 'client_brief', 'start_date', 'deadline', 'status']),
+            ...$request->validated(),
             'created_by' => $request->user()->id,
         ]);
 
@@ -86,7 +87,7 @@ class ProjectController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Project created successfully.',
-            'data' => $project,
+            'data' => new ProjectResource($project),
             'meta' => null,
         ], 201);
     }
@@ -98,56 +99,49 @@ class ProjectController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Project retrieved successfully.',
-            'data' => $project,
+            'data' => new ProjectResource($project),
             'meta' => null,
         ]);
     }
 
-    public function update(Request $request, int $id): JsonResponse
+    public function update(UpdateProjectRequest $request, int $id): JsonResponse
     {
-        if (!$request->user()->isAdmin()) {
+        if (! $request->user()->isAdmin()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized action.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
 
         $project = Project::findOrFail($id);
 
-        $request->validate([
-            'client_id' => 'sometimes|required|exists:clients,id',
-            'name' => 'sometimes|required|string|max:255',
-            'description' => 'nullable|string',
-            'client_brief' => 'nullable|string',
-            'start_date' => 'nullable|date',
-            'deadline' => 'sometimes|required|date',
-            'status' => 'sometimes|required|in:draft,active,on_hold,completed,cancelled',
-        ]);
-
-        $project->update($request->only(['client_id', 'name', 'description', 'client_brief', 'start_date', 'deadline', 'status']));
+        $project->update($request->validated());
         $project->load('client');
 
         return response()->json([
             'success' => true,
             'message' => 'Project updated successfully.',
-            'data' => $project,
+            'data' => new ProjectResource($project),
             'meta' => null,
         ]);
     }
 
     public function destroy(Request $request, int $id): JsonResponse
     {
-        if (!$request->user()->isAdmin()) {
+        if (! $request->user()->isAdmin()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized action.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
 
         $project = Project::findOrFail($id);
-        $project->delete();
+        DB::transaction(function () use ($project): void {
+            $project->tasks()->delete();
+            $project->delete();
+        });
 
         return response()->json([
             'success' => true,

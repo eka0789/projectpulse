@@ -2,10 +2,12 @@ apiVersion: v1
 kind: Service
 metadata:
   name: projectpulse-backend
+  namespace: projectpulse
 spec:
   selector:
-    app: projectpulse-backend
+    app.kubernetes.io/name: projectpulse-backend
   ports:
-    - port: 8000
-      targetPort: 8000
+    - name: http
+      port: 8000
+      targetPort: http
   type: ClusterIP

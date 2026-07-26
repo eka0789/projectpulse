@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Comment\StoreCommentRequest;
+use App\Http\Requests\Comment\UpdateCommentRequest;
+use App\Http\Resources\CommentResource;
 use App\Models\Notification;
 use App\Models\Task;
 use App\Models\TaskComment;
@@ -21,7 +24,7 @@ class CommentController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized action.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
 
@@ -30,12 +33,12 @@ class CommentController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Comments retrieved successfully.',
-            'data' => $comments,
+            'data' => CommentResource::collection($comments),
             'meta' => null,
         ]);
     }
 
-    public function store(Request $request, int $taskId): JsonResponse
+    public function store(StoreCommentRequest $request, int $taskId): JsonResponse
     {
         $task = Task::findOrFail($taskId);
         $user = $request->user();
@@ -44,13 +47,9 @@ class CommentController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized action.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
-
-        $request->validate([
-            'body' => 'required|string|min:1',
-        ]);
 
         $comment = TaskComment::create([
             'task_id' => $task->id,
@@ -75,8 +74,62 @@ class CommentController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Comment added successfully.',
-            'data' => $comment,
+            'data' => new CommentResource($comment),
             'meta' => null,
         ], 201);
+    }
+
+    public function update(UpdateCommentRequest $request, int $id): JsonResponse
+    {
+        $comment = TaskComment::with('task')->findOrFail($id);
+        $user = $request->user();
+
+        if ($comment->user_id !== $user->id || (
+            $user->isMember() && $comment->task->assignee_id !== $user->id
+        )) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You can only edit your own comments.',
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
+            ], 403);
+        }
+
+        $comment->update([
+            'body' => $request->string('body')->toString(),
+            'edited_at' => now(),
+        ]);
+        $comment->load('user');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Comment updated successfully.',
+            'data' => new CommentResource($comment),
+            'meta' => null,
+        ]);
+    }
+
+    public function destroy(Request $request, int $id): JsonResponse
+    {
+        $comment = TaskComment::with('task')->findOrFail($id);
+        $user = $request->user();
+
+        if ($comment->user_id !== $user->id || (
+            $user->isMember() && $comment->task->assignee_id !== $user->id
+        )) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You can only delete your own comments.',
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
+            ], 403);
+        }
+
+        $comment->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Comment deleted successfully.',
+            'data' => null,
+            'meta' => null,
+        ]);
     }
 }

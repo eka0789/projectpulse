@@ -18,6 +18,8 @@
 
 ## 2. Technical Assumptions & Trade-offs
 
-1. **Client Deletion Strategy**: Clients with active projects cannot be hard-deleted. Soft deletes are enforced to preserve historical project and task reporting data.
+1. **Client Deletion Strategy**: Clients with any project cannot be deleted. Existing clients, projects, tasks, and comments use soft deletion where historical preservation is required.
 2. **Task State Machine**: Enforces rigid linear progression (`todo -> in_progress -> review -> done`). Corrective moves back to `in_progress` are allowed from `review`. Admin override transitions are supported via administrative API endpoints.
 3. **Database Migration Strategy in Kubernetes**: Handled via a Kubernetes `Job` (`k8s/backend-migration-job.yaml`) executing before deployment rollout to prevent concurrent schema migration race conditions between backend replicas.
+4. **Mobile token storage**: Ionic Storage was selected because it is explicitly accepted by the exercise and keeps the demo dependency surface small. It is not hardware-backed; a store release should replace it with Keychain/Keystore-backed secure storage.
+5. **Frontend bearer-token storage**: The web persists its token in local storage so web and mobile exercise the same API contract. A same-origin backend-for-frontend with HttpOnly cookies is the preferred hardening step for an internet-facing web deployment.

@@ -1,15 +1,44 @@
-# mobile
+# ProjectPulse Mobile
 
-Aplikasi untuk role `member` (developer/desainer). Pilih salah satu stack — urutan preferensi: **Ionic** (paling diutamakan) → **React Native** (setara) → **Flutter** (poin preferensi stack terkecil, kualitas implementasi tetap dinilai penuh).
+Ionic React/Capacitor Android client for ProjectPulse members.
 
-Struktur yang disarankan:
+## Features
 
-- **Ionic / React Native**: `src/{screens,components,services}`
-- **Flutter**: `lib/{screens,components,services}`
+- Sanctum bearer-token login and session restore
+- member-only role guard and logout
+- assigned-task list with status filters and pull-to-refresh
+- task detail, valid status actions, time logging, and progress notes
+- completed-task history
+- notification inbox with unread badge and mark-read actions
+- loading, empty, API error, validation, and offline states
 
-Isi minimal:
-- `screens/` (atau `pages/`) — layar login, daftar task, detail task, riwayat task selesai, notifikasi.
-- `components/` — widget/komponen yang dipakai berulang.
-- `services/` — pemanggilan API ke backend (auth, tasks, time-logs), penyimpanan token.
+## Run
 
-Hapus sub-folder yang tidak dipakai (mis. kalau pilih Flutter, hapus folder `src/` dan generate `lib/` lewat `flutter create`).
+```bash
+npm ci
+copy .env.example .env
+npm run dev
+```
+
+Use `cp` rather than `copy` on macOS/Linux.
+
+Android emulator:
+
+```bash
+npm run build
+npx cap sync android
+npx cap open android
+```
+
+Capacitor 7 requires JDK 21. The default emulator API URL is `http://10.0.2.2:8000/api`; change `VITE_API_URL` for a physical device.
+
+## Verify
+
+```bash
+npm run lint
+npm run build
+cd android
+gradlew.bat assembleDebug
+```
+
+Ionic Storage is used for the requested demo architecture. Before a public app-store release, use a Keychain/Android Keystore-backed storage plugin for the bearer token.

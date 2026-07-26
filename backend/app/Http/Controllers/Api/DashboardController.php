@@ -11,7 +11,7 @@ class DashboardController extends Controller
 {
     public function summary(Request $request): JsonResponse
     {
-        $service = new DashboardService();
+        $service = new DashboardService;
         $summary = $service->getSummary($request->user());
 
         return response()->json([

@@ -1,57 +1,79 @@
-# ProjectPulse Deployment & Operations Guide
+# Deployment and operations
 
-## 1. Docker Compose Setup
+## Container model
 
-Run the entire application stack locally using Docker Compose:
+- `backend`: PHP 8.3 FrankenPHP/Caddy, non-root UID 10001, application on port 8000.
+- `web`: Next.js standalone Node 20 image, non-root UID 1001, port 3000.
+- `postgres`: PostgreSQL 16 with a named Compose volume or Kubernetes PVC.
+- `queue`: database queue worker using the backend image.
+- `scheduler`: Laravel scheduler using the backend image.
+
+Migrations are intentionally not part of a container entrypoint. This prevents each API replica from racing to migrate the same schema.
+
+## Docker Compose
+
+Create `backend/.env` from the example, generate `APP_KEY`, then:
 
 ```bash
-# 1. Environment Setup
-cp backend/.env.example backend/.env
-cp web/.env.example web/.env.local
-
-# 2. Build and Start Services
 docker compose up --build -d
-
-# 3. Run Database Migrations and Seeders
 docker compose exec backend php artisan migrate --seed
+docker compose ps
+docker compose logs -f backend queue scheduler
 ```
 
-Access Services:
-- Web Admin Dashboard: `http://localhost:3000`
-- Backend REST API: `http://localhost:8000/api`
-- API Health Check: `http://localhost:8000/api/health`
+Readiness depends on a successful database connection:
 
----
-
-## 2. Kubernetes Local Deployment (Minikube / Kind / k3d)
-
-### Deployment Steps
 ```bash
-# 1. Apply Namespace, ConfigMap, and Secret
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/configmap.yaml
-kubectl apply -f k8s/secret.example.yaml
-
-# 2. Deploy PostgreSQL Database
-kubectl apply -f k8s/postgres-statefulset.yaml
-kubectl apply -f k8s/postgres-service.yaml
-
-# 3. Run Migration Job
-kubectl apply -f k8s/backend-migration-job.yaml
-
-# 4. Deploy Backend API and Web Admin
-kubectl apply -f k8s/backend-deployment.yaml
-kubectl apply -f k8s/backend-service.yaml
-kubectl apply -f k8s/web-deployment.yaml
-kubectl apply -f k8s/web-service.yaml
-
-# 5. Apply Ingress & HPA
-kubectl apply -f k8s/ingress.yaml
-kubectl apply -f k8s/backend-hpa.yaml
+curl http://localhost:8000/api/health
+curl http://localhost:8000/api/health/ready
 ```
 
-### Local Ingress DNS Resolution (`hosts` file)
-Add the following line to `/etc/hosts` (Linux/macOS) or `C:\Windows\System32\drivers\etc\hosts` (Windows):
-```text
-127.0.0.1 projectpulse.local api.projectpulse.local
+## Local Kubernetes
+
+The manifests assume the images `projectpulse-backend:latest` and `projectpulse-web:latest` already exist in the local cluster image store.
+
+```bash
+minikube start
+minikube addons enable ingress
+minikube addons enable metrics-server
+minikube image build -t projectpulse-backend:latest backend
+minikube image build -t projectpulse-web:latest --build-arg NEXT_PUBLIC_API_URL=/api web
 ```
+
+Copy `k8s/secret.example.yaml` to the gitignored `k8s/secret.yaml`, replace all `change-me` values, then run:
+
+```bash
+make k8s-apply
+```
+
+The target performs this ordered flow:
+
+1. namespace, ConfigMap, and real Secret;
+2. PostgreSQL Service and StatefulSet;
+3. wait for PostgreSQL rollout;
+4. one migration Job and wait for completion;
+5. API, queue, scheduler, and web Deployments/Services;
+6. Ingress and backend HPA.
+
+The HPA scales the API from 2 to 6 replicas at 70% average CPU and requires metrics-server. Queue and scheduler replicas are managed independently.
+
+## Production adjustments
+
+- Push images with immutable content or commit tags and replace local image names.
+- Terminate TLS at the ingress and change `APP_URL`/CORS origins to HTTPS.
+- Store secrets in a managed secret store rather than a checked-in YAML file.
+- Use managed PostgreSQL with backups, point-in-time recovery, and connection pooling.
+- Set a real DNS hostname and configure an ingress certificate.
+- Forward structured application logs to centralized storage and add uptime/error alerts.
+- Run the migration Job as a gated release step before API rollout.
+
+## Rollback
+
+Application images can be rolled back independently:
+
+```bash
+kubectl rollout undo deployment/projectpulse-backend -n projectpulse
+kubectl rollout undo deployment/projectpulse-web -n projectpulse
+```
+
+Database migrations require migration-specific rollback planning. Do not automatically execute `migrate:rollback` during an application rollback.

@@ -1,86 +1,64 @@
-# ProjectPulse Implementation Plan
+# ProjectPulse implementation plan
 
-> Progress snapshot (2026-07-26): checkboxes below reflect verified repository
-> evidence. A feature is not marked complete solely because a route or document
-> exists. Current verified vertical slice: Sanctum login, protected admin shell,
-> and live dashboard summary. CRUD web screens and the mobile app remain pending.
+Updated 2026-07-26. Completion status is substantiated in `docs/final-audit.md`; this document records scope and execution order.
 
-## 1. Requirement Checklist
+## Requirement checklist
 
-### Role & Access Control
-- [x] Admin role: Web access, manage clients, projects, tasks, assignees, deadlines, AI task breakdown review, Kanban, time logs, reports.
-- [x] Member role: Mobile access, view assigned tasks, task details, update status, progress notes, time logs, task history, notifications.
-- [x] Backend authorization: Enforce role-based policies on all sensitive endpoints (prevent members from viewing other members' tasks or accessing client/project management).
+- [x] Laravel/Sanctum API, PostgreSQL-ready schema, seed data, Form Requests, Resources, role/ownership authorization, rate limits, and consistent errors.
+- [x] Client, project, member, task, time log, progress note, comment, notification, dashboard, and report endpoints.
+- [x] Strict member task transitions plus documented admin corrective transition.
+- [x] OpenAI/Gemini abstraction, timeout/retry, response normalization, audit trail, demo fallback, editable review, and transactional bulk save.
+- [x] Next.js admin login/dashboard and management screens, AI review, Kanban, reports/CSV, and notifications.
+- [x] Ionic/Capacitor Android member login, tasks, status, notes, time, history, notifications, badge, and session handling.
+- [x] Backend/web production Dockerfiles and a Compose stack with PostgreSQL, queue, and scheduler.
+- [x] Kubernetes namespace, ConfigMap/Secret example, PostgreSQL, migration Job, API/web/worker deployments, Services, probes, resources, Ingress, and HPA.
+- [x] GitHub Actions, OpenAPI, Postman, and operational documentation.
+- [x] Backend behavior tests, backend formatter, web/mobile lint and production builds, and native Android debug build.
 
-### Database & Data Models
-- [x] `users`: id, name, email, password, role (admin, member), job_title, avatar_url, is_active, timestamps.
-- [x] `clients`: id, name, company, email, phone, address, notes, created_by, timestamps, soft deletes.
-- [x] `projects`: id, client_id, name, description, client_brief, start_date, deadline, status (draft, active, on_hold, completed, cancelled), created_by, timestamps, soft deletes.
-- [x] `tasks`: id, project_id, title, description, category (frontend, backend, design, qa, devops, management, other), assignee_id, priority (low, medium, high, urgent), status (todo, in_progress, review, done), estimated_hours, start_date, deadline, completed_at, created_by, source (manual, ai), timestamps, soft deletes.
-- [x] `time_logs`: id, task_id, user_id, work_date, duration_minutes, note, timestamps.
-- [x] `progress_notes`: id, task_id, user_id, note, status_snapshot, timestamps.
-- [x] `task_comments`: id, task_id, user_id, body, edited_at, timestamps, soft deletes.
-- [x] `notifications`: id, user_id, type, title, message, data, read_at, timestamps.
-- [x] `ai_task_generations`: id, project_id, requested_by, provider, model, brief_hash, request_payload, response_payload, status, error_code, error_message, latency_ms, timestamps.
+## Dependency map
 
-### Authentication & Security
-- [x] Laravel Sanctum Token Authentication (`POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/register`).
-- [x] Password hashing, login rate limiting, API rate limiting, role middleware, policies.
-- [x] Strict state transitions for tasks (`todo -> in_progress -> review -> done` & `review -> in_progress`).
-- [x] Global exception handling & standardized API response format.
+```text
+PostgreSQL
+  -> Laravel migrations
+  -> Laravel API + queue + scheduler
+  -> Next.js admin
+  -> Ionic/Capacitor member app
 
-### AI Integration
-- [x] Interface-driven `TaskBreakdownProviderInterface` (OpenAI / Gemini implementations).
-- [x] Assistive & resilient AI flow: client brief -> backend validation -> AI provider call -> structured JSON parsing -> admin review & edit -> bulk insert transaction.
-- [x] Fallback mode (`AI_DEMO_FALLBACK_ENABLED`) and non-blocking failure responses (`AI_PROVIDER_UNAVAILABLE`).
+OpenAI or Gemini
+  -> provider abstraction
+  -> normalized suggestions
+  -> admin review
+  -> transactional task bulk endpoint
+```
 
-### Notification & Scheduler
-- [x] Notifications for task assignment, status change, comments, and deadline alerts.
-- [x] Idempotent H-1 upcoming task deadline notification command (`SendUpcomingTaskDeadlineNotifications`).
+## Milestones
 
-### Frontend Apps
-- [x] Web foundation: Next.js App Router, strict TypeScript, Tailwind, reusable UI primitives, TanStack Query, Axios, RHF/Zod, responsive protected shell.
-- [x] Web authentication and dashboard: real Laravel API login/logout/me, centralized bearer token and 401 handling, live dashboard metrics/chart/workload/recent projects, loading/error/empty states.
-- [ ] Web management: Client CRUD, Project CRUD, AI review wizard, Task CRUD, Kanban, members, reports, and notifications.
-- [ ] Mobile Member App: Ionic React / Capacitor login, My Tasks, Task Detail, Status Update, Time Log, History, and Notifications.
+1. Contract and data layer: schema, enums, indexes, models, seed data, error envelope.
+2. Security and workflows: Sanctum, roles, ownership, validation, state machine, notifications.
+3. AI and reporting: providers, audit/failure handling, dashboard aggregates, CSV.
+4. Clients: admin web and Android-first member app connected to the real API.
+5. Delivery: container images, Compose, Kubernetes, CI, OpenAPI/Postman, final verification.
 
-### DevOps & Infrastructure
-- [x] Dockerfiles for Backend & Web Admin (web uses a non-root standalone Next.js runtime).
-- [ ] `docker-compose.yml` defines PostgreSQL, Backend, Web Admin, Queue, and Scheduler, but runtime validation is pending because Docker is not installed in the current environment.
-- [ ] Kubernetes manifests: present only in part and still require PostgreSQL StatefulSet, migration Job, HPA, resource limits, and end-to-end validation.
-- [ ] CI Workflow: not yet verified.
-- [ ] Postman Collection & Environment: not yet verified.
+## Risks and mitigation
 
----
-
-## 2. Milestones & Implementation Timeline
-
-| Day / Phase | Key Milestone | Primary Deliverables |
-|---|---|---|
-| **Phase 1** | Foundation & Backend API | Laravel Sanctum setup, Migrations, Models, Policies, Resources, Controllers, Seeders, Feature Tests |
-| **Phase 2** | AI Integration & Web Admin | Provider abstraction, Task Breakdown Service, Next.js Web Admin pages, Dashboard, Kanban, AI review wizard |
-| **Phase 3** | Mobile App & Workflows | Ionic React mobile app, Authentication, Task list, Detail, Time Log, Progress Notes, Notifications |
-| **Phase 4** | DevOps, Testing & Audit | Docker, Compose, K8s manifests, Postman Collection, CI workflow, Comprehensive Documentation & Final Audit |
-
----
-
-## 3. Risk Management & Acceptance Criteria
-
-| Risk | Mitigation Strategy |
+| Risk | Mitigation |
 |---|---|
-| AI API rate limits / downtime | Implement timeout (20s), strict fallback handler, and non-blocking response format. Admin can always manually create tasks. |
-| Dual client types (Web & Mobile) | Shared OpenAPI standard REST endpoints, token revocation, strict backend authorization check for roles. |
-| Duplicate deadline notifications | Idempotency key tracking via database notification checks before dispatching. |
-| Invalid task state transitions | Enforce state transition rules in `TaskStateService` and return `422 Unprocessable Entity` on invalid state change. |
+| AI downtime or malformed output | Timeout/retry, strict normalization, generic errors, offline demo source, manual tasks remain available |
+| Cross-user data access | API query scoping plus feature tests for task/log/note/comment/notification ownership |
+| Duplicate reminders | Daily scheduler plus task/deadline idempotency check and automated test |
+| Replica migration race | Explicit one-shot migration Job; no migration in container startup |
+| Token extraction through client compromise | CSP/XSS hygiene and documented migration to HttpOnly BFF / native secure storage |
+| Environment-specific deployment assumptions | `.env.example`, unusable Secret example, local image instructions, probes, and honest audit limitations |
 
----
+## Acceptance criteria
 
-## 4. Implementation Order
+- A seeded admin can manage the complete client → project → reviewed AI/manual tasks workflow.
+- A seeded member can only access assigned work and complete the mobile reporting workflow.
+- AI failure does not block manual project/task operations.
+- Every protected request requires an active Sanctum identity and sensitive routes require admin or ownership checks.
+- Lint/type compilation/tests/builds finish successfully in the documented toolchain.
+- Deployment manifests contain no usable secrets or critical placeholders.
 
-1. Complete Architecture, Database Schema, API, Security, Testing & Decisions Documentation in `docs/`.
-2. Build Laravel Backend foundation (`app/`, `database/`, `routes/api.php`, `tests/`).
-3. Build Web Admin (`web/src/` with React/Next.js components, services, and pages).
-4. Build Mobile App (`mobile/src/` with Ionic React components, stores, pages).
-5. Configure DevOps & Infrastructure (`docker-compose.yml`, Dockerfiles, `k8s/` manifests, CI).
-6. Generate Postman collection & environment.
-7. Conduct full testing and produce `docs/final-audit.md`.
+## Non-negotiable scope
+
+Authorization, backend validation, state transitions, secret separation, AI review-before-save, migration safety, and truthful verification status may not be traded away for UI polish or bonus features.

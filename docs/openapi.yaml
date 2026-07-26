@@ -1,0 +1,704 @@
+openapi: 3.1.0
+info:
+  title: ProjectPulse API
+  version: 1.0.0
+  description: Token-authenticated API shared by the ProjectPulse admin web and member mobile apps.
+servers:
+  - url: http://localhost:8000/api
+    description: Local Docker or Laravel server
+tags:
+  - name: Health
+  - name: Authentication
+  - name: Members
+  - name: Clients
+  - name: Projects
+  - name: Tasks
+  - name: Work logs
+  - name: Collaboration
+  - name: Notifications
+  - name: Dashboard
+  - name: Reports
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      responses:
+        "200": { description: Process is alive }
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Database readiness probe
+      responses:
+        "200": { description: Service is ready }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: Exchange credentials for a Sanctum token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200": { $ref: "#/components/responses/AuthSuccess" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /auth/register:
+    post:
+      tags: [Authentication]
+      summary: Development-only public member registration
+      description: Disabled by default through ALLOW_PUBLIC_REGISTRATION=false. Admins create members through /members.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberInput"
+      responses:
+        "201": { $ref: "#/components/responses/AuthSuccess" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      security: [{ bearerAuth: [] }]
+      summary: Revoke the current token
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /auth/me:
+    get:
+      tags: [Authentication]
+      security: [{ bearerAuth: [] }]
+      summary: Return the current user
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /members:
+    get:
+      tags: [Members]
+      security: [{ bearerAuth: [] }]
+      summary: List team members (admin)
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200": { $ref: "#/components/responses/Collection" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Members]
+      security: [{ bearerAuth: [] }]
+      summary: Create a member (admin)
+      requestBody:
+        $ref: "#/components/requestBodies/Member"
+      responses:
+        "201": { $ref: "#/components/responses/Success" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /members/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Members]
+      security: [{ bearerAuth: [] }]
+      summary: Get a member (admin)
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Members]
+      security: [{ bearerAuth: [] }]
+      summary: Update a member (admin)
+      requestBody:
+        $ref: "#/components/requestBodies/Member"
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Members]
+      security: [{ bearerAuth: [] }]
+      summary: Deactivate a member (admin)
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /clients:
+    get:
+      tags: [Clients]
+      security: [{ bearerAuth: [] }]
+      summary: List clients (admin)
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - { name: company, in: query, schema: { type: string } }
+        - { name: created_from, in: query, schema: { type: string, format: date } }
+        - { name: created_to, in: query, schema: { type: string, format: date } }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+        - $ref: "#/components/parameters/Sort"
+        - $ref: "#/components/parameters/Direction"
+      responses:
+        "200": { $ref: "#/components/responses/Collection" }
+    post:
+      tags: [Clients]
+      security: [{ bearerAuth: [] }]
+      summary: Create a client (admin)
+      requestBody:
+        $ref: "#/components/requestBodies/Client"
+      responses:
+        "201": { $ref: "#/components/responses/Success" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /clients/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Clients]
+      security: [{ bearerAuth: [] }]
+      summary: Get a client (admin)
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Clients]
+      security: [{ bearerAuth: [] }]
+      summary: Update a client (admin)
+      requestBody:
+        $ref: "#/components/requestBodies/Client"
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    delete:
+      tags: [Clients]
+      security: [{ bearerAuth: [] }]
+      summary: Soft-delete a client without projects (admin)
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /projects:
+    get:
+      tags: [Projects]
+      security: [{ bearerAuth: [] }]
+      summary: List projects (admin)
+      parameters:
+        - $ref: "#/components/parameters/Search"
+        - { name: client_id, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/ProjectStatus" } }
+        - { name: deadline_from, in: query, schema: { type: string, format: date } }
+        - { name: deadline_to, in: query, schema: { type: string, format: date } }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200": { $ref: "#/components/responses/Collection" }
+    post:
+      tags: [Projects]
+      security: [{ bearerAuth: [] }]
+      summary: Create a project (admin)
+      requestBody:
+        $ref: "#/components/requestBodies/Project"
+      responses:
+        "201": { $ref: "#/components/responses/Success" }
+  /projects/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Projects]
+      security: [{ bearerAuth: [] }]
+      summary: Get a project (admin)
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Projects]
+      security: [{ bearerAuth: [] }]
+      summary: Update a project (admin)
+      requestBody:
+        $ref: "#/components/requestBodies/Project"
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    delete:
+      tags: [Projects]
+      security: [{ bearerAuth: [] }]
+      summary: Soft-delete a project and its tasks (admin)
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /projects/{projectId}/tasks:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      tags: [Tasks]
+      security: [{ bearerAuth: [] }]
+      summary: List tasks in a project (admin)
+      responses:
+        "200": { $ref: "#/components/responses/Collection" }
+    post:
+      tags: [Tasks]
+      security: [{ bearerAuth: [] }]
+      summary: Create a task in a project (admin)
+      requestBody:
+        $ref: "#/components/requestBodies/Task"
+      responses:
+        "201": { $ref: "#/components/responses/Success" }
+  /projects/{projectId}/tasks/generate:
+    post:
+      tags: [Tasks]
+      security: [{ bearerAuth: [] }]
+      summary: Generate editable AI task suggestions (admin)
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AIGenerationInput"
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "503": { $ref: "#/components/responses/ServiceUnavailable" }
+  /projects/{projectId}/tasks/bulk:
+    post:
+      tags: [Tasks]
+      security: [{ bearerAuth: [] }]
+      summary: Persist reviewed task suggestions transactionally (admin)
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tasks]
+              properties:
+                tasks:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items: { $ref: "#/components/schemas/TaskInput" }
+      responses:
+        "201": { $ref: "#/components/responses/Collection" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /tasks:
+    get:
+      tags: [Tasks]
+      security: [{ bearerAuth: [] }]
+      summary: List all tasks for admins or assigned tasks for members
+      parameters:
+        - { name: assignee, in: query, schema: { type: integer } }
+        - { name: project_id, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/TaskStatus" } }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: priority, in: query, schema: { type: string } }
+        - { name: overdue, in: query, schema: { type: boolean } }
+        - $ref: "#/components/parameters/Search"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200": { $ref: "#/components/responses/Collection" }
+  /tasks/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Tasks]
+      security: [{ bearerAuth: [] }]
+      summary: Get an authorized task
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    patch:
+      tags: [Tasks]
+      security: [{ bearerAuth: [] }]
+      summary: Update task fields (admin)
+      requestBody:
+        $ref: "#/components/requestBodies/Task"
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    delete:
+      tags: [Tasks]
+      security: [{ bearerAuth: [] }]
+      summary: Soft-delete a task (admin)
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /tasks/{id}/status:
+    patch:
+      tags: [Tasks]
+      security: [{ bearerAuth: [] }]
+      summary: Apply a validated task status transition
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: "#/components/schemas/TaskStatus" }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /tasks/{taskId}/time-logs:
+    parameters:
+      - $ref: "#/components/parameters/TaskId"
+    get:
+      tags: [Work logs]
+      security: [{ bearerAuth: [] }]
+      summary: List authorized time entries
+      responses:
+        "200": { $ref: "#/components/responses/Collection" }
+    post:
+      tags: [Work logs]
+      security: [{ bearerAuth: [] }]
+      summary: Log up to 24 hours on an assigned task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TimeLogInput"
+      responses:
+        "201": { $ref: "#/components/responses/Success" }
+  /time-logs/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    patch:
+      tags: [Work logs]
+      security: [{ bearerAuth: [] }]
+      summary: Update an owned time entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TimeLogInput" }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    delete:
+      tags: [Work logs]
+      security: [{ bearerAuth: [] }]
+      summary: Delete an owned time entry
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /tasks/{taskId}/progress-notes:
+    parameters:
+      - $ref: "#/components/parameters/TaskId"
+    get:
+      tags: [Collaboration]
+      security: [{ bearerAuth: [] }]
+      summary: List progress notes
+      responses:
+        "200": { $ref: "#/components/responses/Collection" }
+    post:
+      tags: [Collaboration]
+      security: [{ bearerAuth: [] }]
+      summary: Add a progress note to an assigned task
+      requestBody:
+        $ref: "#/components/requestBodies/Note"
+      responses:
+        "201": { $ref: "#/components/responses/Success" }
+  /progress-notes/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    patch:
+      tags: [Collaboration]
+      security: [{ bearerAuth: [] }]
+      summary: Update an owned progress note
+      requestBody:
+        $ref: "#/components/requestBodies/Note"
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    delete:
+      tags: [Collaboration]
+      security: [{ bearerAuth: [] }]
+      summary: Delete an owned progress note
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /tasks/{taskId}/comments:
+    parameters:
+      - $ref: "#/components/parameters/TaskId"
+    get:
+      tags: [Collaboration]
+      security: [{ bearerAuth: [] }]
+      summary: List comments on an authorized task
+      responses:
+        "200": { $ref: "#/components/responses/Collection" }
+    post:
+      tags: [Collaboration]
+      security: [{ bearerAuth: [] }]
+      summary: Add a comment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, minLength: 1, maxLength: 5000 }
+      responses:
+        "201": { $ref: "#/components/responses/Success" }
+  /comments/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    patch:
+      tags: [Collaboration]
+      security: [{ bearerAuth: [] }]
+      summary: Edit an owned comment
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    delete:
+      tags: [Collaboration]
+      security: [{ bearerAuth: [] }]
+      summary: Soft-delete an owned comment
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /notifications:
+    get:
+      tags: [Notifications]
+      security: [{ bearerAuth: [] }]
+      summary: List current-user notifications
+      responses:
+        "200": { $ref: "#/components/responses/Collection" }
+  /notifications/unread-count:
+    get:
+      tags: [Notifications]
+      security: [{ bearerAuth: [] }]
+      summary: Count unread current-user notifications
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      security: [{ bearerAuth: [] }]
+      summary: Mark an owned notification read
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /notifications/read-all:
+    patch:
+      tags: [Notifications]
+      security: [{ bearerAuth: [] }]
+      summary: Mark all current-user notifications read
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /dashboard/summary:
+    get:
+      tags: [Dashboard]
+      security: [{ bearerAuth: [] }]
+      summary: Return admin KPI, workload, status, and deadline summaries
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /reports/time-logs:
+    get:
+      tags: [Reports]
+      security: [{ bearerAuth: [] }]
+      summary: Return admin time-report aggregates
+      parameters:
+        - { name: project_id, in: query, schema: { type: integer } }
+        - { name: member_id, in: query, schema: { type: integer } }
+        - { name: date_from, in: query, schema: { type: string, format: date } }
+        - { name: date_to, in: query, schema: { type: string, format: date } }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /reports/time-logs/export.csv:
+    get:
+      tags: [Reports]
+      security: [{ bearerAuth: [] }]
+      summary: Export authorized time logs as CSV
+      responses:
+        "200":
+          description: CSV file
+          content:
+            text/csv:
+              schema: { type: string }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+  parameters:
+    Id: { name: id, in: path, required: true, schema: { type: integer } }
+    TaskId: { name: taskId, in: path, required: true, schema: { type: integer } }
+    ProjectId: { name: projectId, in: path, required: true, schema: { type: integer } }
+    Search: { name: search, in: query, schema: { type: string, maxLength: 255 } }
+    Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+    PerPage: { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 15 } }
+    Sort: { name: sort, in: query, schema: { type: string } }
+    Direction: { name: direction, in: query, schema: { type: string, enum: [asc, desc] } }
+  requestBodies:
+    Client:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ClientInput" }
+    Project:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ProjectInput" }
+    Task:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/TaskInput" }
+    Member:
+      required: true
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/MemberInput" }
+    Note:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [note]
+            properties:
+              note: { type: string, minLength: 3, maxLength: 5000 }
+  responses:
+    Success:
+      description: Successful envelope
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/SuccessEnvelope" }
+    Collection:
+      description: Paginated or list envelope
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/CollectionEnvelope" }
+    AuthSuccess:
+      description: Authentication succeeded
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/AuthEnvelope" }
+    ValidationError: { description: Invalid input, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    Unauthenticated: { description: Missing or invalid token, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    Forbidden: { description: Insufficient permission, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    NotFound: { description: Resource not found, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    Conflict: { description: Business rule conflict, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    RateLimited: { description: Rate limit exceeded, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+    ServiceUnavailable: { description: Dependency unavailable, content: { application/json: { schema: { $ref: "#/components/schemas/ErrorEnvelope" } } } }
+  schemas:
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8, format: password }
+    MemberInput:
+      type: object
+      required: [name, email, password]
+      properties:
+        name: { type: string, maxLength: 255 }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8, format: password }
+        job_title: { type: [string, "null"], maxLength: 255 }
+        is_active: { type: boolean }
+    ClientInput:
+      type: object
+      required: [name, company]
+      properties:
+        name: { type: string, maxLength: 255 }
+        company: { type: string, maxLength: 255 }
+        email: { type: [string, "null"], format: email }
+        phone: { type: [string, "null"], maxLength: 50 }
+        address: { type: [string, "null"], maxLength: 2000 }
+        notes: { type: [string, "null"], maxLength: 5000 }
+    ProjectStatus:
+      type: string
+      enum: [draft, active, on_hold, completed, cancelled]
+    ProjectInput:
+      type: object
+      required: [client_id, name, deadline, status]
+      properties:
+        client_id: { type: integer }
+        name: { type: string, maxLength: 255 }
+        description: { type: [string, "null"], maxLength: 5000 }
+        client_brief: { type: [string, "null"], maxLength: 20000 }
+        start_date: { type: [string, "null"], format: date }
+        deadline: { type: string, format: date }
+        status: { $ref: "#/components/schemas/ProjectStatus" }
+    TaskStatus:
+      type: string
+      enum: [todo, in_progress, review, done]
+    TaskInput:
+      type: object
+      required: [title, category, priority]
+      properties:
+        title: { type: string, maxLength: 255 }
+        description: { type: [string, "null"], maxLength: 5000 }
+        category: { type: string, enum: [frontend, backend, design, qa, devops, management, other] }
+        assignee_id: { type: [integer, "null"] }
+        priority: { type: string, enum: [low, medium, high, urgent] }
+        status: { $ref: "#/components/schemas/TaskStatus" }
+        estimated_hours: { type: [number, "null"], minimum: 0, maximum: 1000 }
+        start_date: { type: [string, "null"], format: date }
+        deadline: { type: [string, "null"], format: date }
+        source: { type: string, enum: [manual, ai], default: manual }
+    TimeLogInput:
+      type: object
+      required: [work_date, duration_minutes]
+      properties:
+        work_date: { type: string, format: date }
+        duration_minutes: { type: integer, minimum: 1, maximum: 1440 }
+        note: { type: [string, "null"], maxLength: 5000 }
+    AIGenerationInput:
+      type: object
+      required: [brief]
+      properties:
+        brief: { type: string, minLength: 20, maxLength: 20000 }
+        preferences:
+          type: object
+          properties:
+            include_qa: { type: boolean, default: true }
+            include_devops: { type: boolean, default: true }
+            maximum_tasks: { type: integer, minimum: 1, maximum: 50, default: 15 }
+    SuccessEnvelope:
+      type: object
+      required: [success, message, data]
+      properties:
+        success: { type: boolean, const: true }
+        message: { type: string }
+        data: {}
+        meta: { type: [object, "null"] }
+    CollectionEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data: { type: array, items: {} }
+            meta:
+              type: [object, "null"]
+              properties:
+                current_page: { type: integer }
+                per_page: { type: integer }
+                total: { type: integer }
+                last_page: { type: integer }
+    AuthEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                token: { type: string }
+                token_type: { type: string, const: Bearer }
+                user: { type: object }
+    ErrorEnvelope:
+      type: object
+      required: [success, message, error]
+      properties:
+        success: { type: boolean, const: false }
+        message: { type: string }
+        error:
+          type: object
+          required: [code]
+          properties:
+            code:
+              type: string
+              enum: [UNAUTHENTICATED, FORBIDDEN, RESOURCE_NOT_FOUND, VALIDATION_ERROR, INVALID_STATUS_TRANSITION, AI_PROVIDER_UNAVAILABLE, AI_REQUEST_TIMEOUT, AI_INVALID_RESPONSE, RATE_LIMIT_EXCEEDED, INTERNAL_SERVER_ERROR]
+            details: {}

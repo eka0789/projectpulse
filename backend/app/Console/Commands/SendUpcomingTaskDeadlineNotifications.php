@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 class SendUpcomingTaskDeadlineNotifications extends Command
 {
     protected $signature = 'notifications:send-upcoming-deadlines';
+
     protected $description = 'Send idempotent notification to assigned members for tasks due tomorrow (H-1)';
 
     public function handle(): int
@@ -20,7 +21,7 @@ class SendUpcomingTaskDeadlineNotifications extends Command
         $tasksDueTomorrow = Task::where('status', '!=', 'done')
             ->whereNotNull('assignee_id')
             ->whereNotNull('deadline')
-            ->where('deadline', '=', $tomorrow)
+            ->whereDate('deadline', $tomorrow)
             ->get();
 
         $count = 0;
@@ -32,7 +33,7 @@ class SendUpcomingTaskDeadlineNotifications extends Command
                 ->whereJsonContains('data->deadline', $tomorrow)
                 ->exists();
 
-            if (!$alreadyNotified) {
+            if (! $alreadyNotified) {
                 Notification::create([
                     'id' => (string) Str::uuid(),
                     'user_id' => $task->assignee_id,
@@ -50,6 +51,7 @@ class SendUpcomingTaskDeadlineNotifications extends Command
         }
 
         $this->info("Sent {$count} upcoming deadline notifications.");
+
         return Command::SUCCESS;
     }
 }

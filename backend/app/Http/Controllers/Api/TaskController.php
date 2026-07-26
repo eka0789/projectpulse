@@ -4,6 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\TaskStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\AI\GenerateTaskBreakdownRequest;
+use App\Http\Requests\Task\BulkStoreTasksRequest;
+use App\Http\Requests\Task\StoreTaskRequest;
+use App\Http\Requests\Task\UpdateTaskRequest;
+use App\Http\Requests\Task\UpdateTaskStatusRequest;
+use App\Http\Resources\TaskResource;
 use App\Models\Notification;
 use App\Models\Project;
 use App\Models\Task;
@@ -17,6 +23,10 @@ use Illuminate\Support\Str;
 
 class TaskController extends Controller
 {
+    public function __construct(
+        private readonly TaskBreakdownService $taskBreakdownService
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -25,8 +35,8 @@ class TaskController extends Controller
 
         if ($user->isMember()) {
             $query->where('assignee_id', $user->id);
-        } elseif ($request->filled('assignee_id')) {
-            $query->where('assignee_id', $request->assignee_id);
+        } elseif ($request->filled('assignee_id') || $request->filled('assignee')) {
+            $query->where('assignee_id', $request->input('assignee_id', $request->input('assignee')));
         }
 
         if ($request->filled('project_id')) {
@@ -45,6 +55,14 @@ class TaskController extends Controller
             $query->where('priority', $request->priority);
         }
 
+        if ($request->filled('deadline_from')) {
+            $query->whereDate('deadline', '>=', $request->string('deadline_from'));
+        }
+
+        if ($request->filled('deadline_to')) {
+            $query->whereDate('deadline', '<=', $request->string('deadline_to'));
+        }
+
         if ($request->boolean('overdue')) {
             $query->where('status', '!=', 'done')
                 ->whereNotNull('deadline')
@@ -56,49 +74,44 @@ class TaskController extends Controller
             $query->where('title', 'like', "%{$search}%");
         }
 
-        $tasks = $query->orderBy('updated_at', 'desc')->paginate($request->get('per_page', 15));
+        $sort = in_array($request->string('sort')->toString(), ['title', 'status', 'priority', 'deadline', 'created_at', 'updated_at'], true)
+            ? $request->string('sort')->toString()
+            : 'updated_at';
+        $direction = in_array($request->string('direction')->lower()->toString(), ['asc', 'desc'], true)
+            ? $request->string('direction')->lower()->toString()
+            : 'desc';
+        $perPage = max(1, min($request->integer('per_page', 15), 100));
+        $tasks = $query->orderBy($sort, $direction)->paginate($perPage);
 
         return response()->json([
             'success' => true,
             'message' => 'Tasks retrieved successfully.',
-            'data' => $tasks->items(),
+            'data' => TaskResource::collection($tasks->getCollection()),
             'meta' => [
                 'current_page' => $tasks->currentPage(),
                 'per_page' => $tasks->perPage(),
                 'total' => $tasks->total(),
                 'last_page' => $tasks->lastPage(),
-            ]
+            ],
         ]);
     }
 
-    public function store(Request $request, ?int $projectId = null): JsonResponse
+    public function store(StoreTaskRequest $request, ?int $projectId = null): JsonResponse
     {
-        if (!$request->user()->isAdmin()) {
+        if (! $request->user()->isAdmin()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized action.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
 
         $targetProjectId = $projectId ?? $request->project_id;
 
-        $request->validate([
-            'project_id' => $projectId ? 'nullable' : 'required|exists:projects,id',
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'category' => 'required|in:frontend,backend,design,qa,devops,management,other',
-            'assignee_id' => 'nullable|exists:users,id',
-            'priority' => 'required|in:low,medium,high,urgent',
-            'status' => 'required|in:todo,in_progress,review,done',
-            'estimated_hours' => 'nullable|numeric|min:0.1|max:500',
-            'start_date' => 'nullable|date',
-            'deadline' => 'nullable|date',
-        ]);
-
+        $data = $request->safe()->except('project_id');
         $task = Task::create([
             'project_id' => $targetProjectId,
-            ...$request->only(['title', 'description', 'category', 'assignee_id', 'priority', 'status', 'estimated_hours', 'start_date', 'deadline']),
+            ...$data,
             'created_by' => $request->user()->id,
             'source' => 'manual',
         ]);
@@ -112,7 +125,7 @@ class TaskController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Task created successfully.',
-            'data' => $task,
+            'data' => new TaskResource($task),
             'meta' => null,
         ], 201);
     }
@@ -128,44 +141,32 @@ class TaskController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized action.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
 
         return response()->json([
             'success' => true,
             'message' => 'Task retrieved successfully.',
-            'data' => $task,
+            'data' => new TaskResource($task),
             'meta' => null,
         ]);
     }
 
-    public function update(Request $request, int $id): JsonResponse
+    public function update(UpdateTaskRequest $request, int $id): JsonResponse
     {
-        if (!$request->user()->isAdmin()) {
+        if (! $request->user()->isAdmin()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized action.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
 
         $task = Task::findOrFail($id);
         $oldAssigneeId = $task->assignee_id;
 
-        $request->validate([
-            'title' => 'sometimes|required|string|max:255',
-            'description' => 'nullable|string',
-            'category' => 'sometimes|required|in:frontend,backend,design,qa,devops,management,other',
-            'assignee_id' => 'nullable|exists:users,id',
-            'priority' => 'sometimes|required|in:low,medium,high,urgent',
-            'status' => 'sometimes|required|in:todo,in_progress,review,done',
-            'estimated_hours' => 'nullable|numeric|min:0.1|max:500',
-            'start_date' => 'nullable|date',
-            'deadline' => 'nullable|date',
-        ]);
-
-        $task->update($request->only(['title', 'description', 'category', 'assignee_id', 'priority', 'status', 'estimated_hours', 'start_date', 'deadline']));
+        $task->update($request->validated());
 
         if ($request->filled('assignee_id') && $request->assignee_id !== $oldAssigneeId) {
             $this->createAssignmentNotification($task, $request->assignee_id);
@@ -176,12 +177,12 @@ class TaskController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Task updated successfully.',
-            'data' => $task,
+            'data' => new TaskResource($task),
             'meta' => null,
         ]);
     }
 
-    public function updateStatus(Request $request, int $id): JsonResponse
+    public function updateStatus(UpdateTaskStatusRequest $request, int $id): JsonResponse
     {
         $user = $request->user();
         $task = Task::findOrFail($id);
@@ -190,31 +191,29 @@ class TaskController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized action.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
-
-        $request->validate([
-            'status' => 'required|in:todo,in_progress,review,done',
-        ]);
 
         $currentStatus = TaskStatus::from($task->status);
         $targetStatus = TaskStatus::from($request->status);
 
-        if (!$user->isAdmin() && !$currentStatus->isValidTransitionTo($targetStatus)) {
+        if (! $user->isAdmin() && ! $currentStatus->isValidTransitionTo($targetStatus)) {
             return response()->json([
                 'success' => false,
                 'message' => "Invalid status transition from '{$task->status}' to '{$request->status}'.",
                 'error' => [
                     'code' => 'INVALID_STATUS_TRANSITION',
                     'details' => null,
-                ]
+                ],
             ], 422);
         }
 
         $task->status = $targetStatus->value;
         if ($targetStatus === TaskStatus::DONE) {
             $task->completed_at = now();
+        } else {
+            $task->completed_at = null;
         }
         $task->save();
 
@@ -232,18 +231,18 @@ class TaskController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Task status updated successfully.',
-            'data' => $task,
+            'data' => new TaskResource($task),
             'meta' => null,
         ]);
     }
 
     public function destroy(Request $request, int $id): JsonResponse
     {
-        if (!$request->user()->isAdmin()) {
+        if (! $request->user()->isAdmin()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized action.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
 
@@ -258,39 +257,34 @@ class TaskController extends Controller
         ]);
     }
 
-    public function generateAISuggestions(Request $request, int $projectId): JsonResponse
+    public function generateAISuggestions(GenerateTaskBreakdownRequest $request, int $projectId): JsonResponse
     {
-        if (!$request->user()->isAdmin()) {
+        if (! $request->user()->isAdmin()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized action.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
 
         $project = Project::findOrFail($projectId);
 
-        $request->validate([
-            'brief' => 'required|string|min:10|max:10000',
-            'preferences' => 'nullable|array',
-        ]);
-
-        $service = new TaskBreakdownService();
-        $result = $service->generateTasks(new TaskBreakdownRequestData(
-            brief: $request->brief,
-            preferences: $request->preferences ?? [],
+        $data = $request->validated();
+        $result = $this->taskBreakdownService->generateTasks(new TaskBreakdownRequestData(
+            brief: $data['brief'],
+            preferences: $data['preferences'] ?? [],
             projectId: $project->id,
             userId: $request->user()->id
         ));
 
-        if (!$result->success) {
+        if (! $result->success) {
             return response()->json([
                 'success' => false,
                 'message' => $result->errorMessage ?? 'AI task suggestions are temporarily unavailable. You can continue by adding tasks manually.',
                 'error' => [
                     'code' => $result->errorCode ?? 'AI_PROVIDER_UNAVAILABLE',
                     'details' => null,
-                ]
+                ],
             ], 503);
         }
 
@@ -307,37 +301,27 @@ class TaskController extends Controller
             'meta' => [
                 'generated_at' => now()->toIso8601String(),
                 'latency_ms' => $result->latencyMs,
-            ]
+            ],
         ]);
     }
 
-    public function bulkStore(Request $request, int $projectId): JsonResponse
+    public function bulkStore(BulkStoreTasksRequest $request, int $projectId): JsonResponse
     {
-        if (!$request->user()->isAdmin()) {
+        if (! $request->user()->isAdmin()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized action.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
 
         $project = Project::findOrFail($projectId);
 
-        $request->validate([
-            'tasks' => 'required|array|min:1',
-            'tasks.*.title' => 'required|string|max:255',
-            'tasks.*.description' => 'nullable|string',
-            'tasks.*.category' => 'required|in:frontend,backend,design,qa,devops,management,other',
-            'tasks.*.priority' => 'required|in:low,medium,high,urgent',
-            'tasks.*.estimated_hours' => 'nullable|numeric|min:0.5|max:500',
-            'tasks.*.assignee_id' => 'nullable|exists:users,id',
-            'tasks.*.deadline' => 'nullable|date',
-            'tasks.*.source' => 'nullable|in:manual,ai',
-        ]);
+        $tasks = $request->validated('tasks');
 
-        $createdTasks = DB::transaction(function () use ($request, $project) {
+        $createdTasks = DB::transaction(function () use ($request, $project, $tasks) {
             $items = [];
-            foreach ($request->tasks as $raw) {
+            foreach ($tasks as $raw) {
                 $task = Task::create([
                     'project_id' => $project->id,
                     'title' => $raw['title'],
@@ -356,15 +340,17 @@ class TaskController extends Controller
                     $this->createAssignmentNotification($task, $task->assignee_id);
                 }
 
+                $task->load(['project', 'assignee']);
                 $items[] = $task;
             }
+
             return $items;
         });
 
         return response()->json([
             'success' => true,
-            'message' => count($createdTasks) . ' tasks created successfully.',
-            'data' => $createdTasks,
+            'message' => count($createdTasks).' tasks created successfully.',
+            'data' => TaskResource::collection(collect($createdTasks)),
             'meta' => null,
         ], 201);
     }

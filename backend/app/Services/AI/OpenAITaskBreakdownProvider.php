@@ -2,221 +2,172 @@
 
 namespace App\Services\AI;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class OpenAITaskBreakdownProvider implements TaskBreakdownProviderInterface
 {
+    public function __construct(
+        private readonly TaskBreakdownNormalizer $normalizer
+    ) {}
+
     public function generate(TaskBreakdownRequestData $request): TaskBreakdownResult
     {
-        $startTime = microtime(true);
-        $apiKey = config('services.ai.openai.api_key', env('AI_API_KEY'));
-        $model = config('services.ai.openai.model', env('AI_MODEL', 'gpt-4o-mini'));
-        $timeout = (int) env('AI_TIMEOUT_SECONDS', 20);
+        $startedAt = microtime(true);
+        $apiKey = config('services.ai.openai.api_key');
+        $model = (string) config('services.ai.openai.model');
 
-        if (env('AI_DEMO_FALLBACK_ENABLED', false) && empty($apiKey)) {
-            return $this->getDemoFallbackResult($startTime, 'openai', $model);
-        }
+        Log::info('AI task generation started', [
+            'provider' => 'openai',
+            'model' => $model,
+            'brief_hash' => hash('sha256', $request->brief),
+        ]);
 
-        if (empty($apiKey)) {
-            $latencyMs = (int) ((microtime(true) - $startTime) * 1000);
-            return new TaskBreakdownResult(
-                success: false,
-                provider: 'openai',
-                model: $model,
-                latencyMs: $latencyMs,
-                errorCode: 'AI_PROVIDER_UNAVAILABLE',
-                errorMessage: 'AI provider API key is not configured.'
-            );
+        if (blank($apiKey)) {
+            return config('services.ai.demo_fallback_enabled')
+                ? $this->demoResult($request, $startedAt, $model)
+                : $this->failure(
+                    $startedAt,
+                    $model,
+                    'AI_PROVIDER_UNAVAILABLE',
+                    'The AI provider is not configured.'
+                );
         }
 
         try {
-            $prompt = $this->buildPrompt($request->brief, $request->preferences);
-
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $apiKey,
-                'Content-Type' => 'application/json',
-            ])->timeout($timeout)->post('https://api.openai.com/v1/chat/completions', [
-                'model' => $model,
-                'messages' => [
-                    ['role' => 'system', 'content' => 'You are an expert technical project manager. Analyze the client brief and respond strictly with JSON containing an array of project tasks.'],
-                    ['role' => 'user', 'content' => $prompt],
-                ],
-                'response_format' => ['type' => 'json_object'],
-                'temperature' => 0.7,
-            ]);
-
-            $latencyMs = (int) ((microtime(true) - $startTime) * 1000);
-
-            if ($response->failed()) {
-                Log::warning('OpenAI task breakdown failed', [
-                    'status' => $response->status(),
-                    'error' => $response->body(),
+            $response = Http::acceptJson()
+                ->withToken($apiKey)
+                ->timeout((int) config('services.ai.timeout_seconds'))
+                ->retry(2, 250, throw: false)
+                ->post('https://api.openai.com/v1/chat/completions', [
+                    'model' => $model,
+                    'messages' => [
+                        [
+                            'role' => 'system',
+                            'content' => 'Return only valid JSON containing a tasks array for a software delivery plan.',
+                        ],
+                        ['role' => 'user', 'content' => $this->buildPrompt($request)],
+                    ],
+                    'response_format' => ['type' => 'json_object'],
+                    'temperature' => 0.3,
                 ]);
 
-                if (env('AI_DEMO_FALLBACK_ENABLED', false)) {
-                    return $this->getDemoFallbackResult($startTime, 'openai', $model);
-                }
+            if ($response->failed()) {
+                Log::warning('AI provider request failed', [
+                    'provider' => 'openai',
+                    'status' => $response->status(),
+                ]);
 
-                return new TaskBreakdownResult(
-                    success: false,
-                    provider: 'openai',
-                    model: $model,
-                    latencyMs: $latencyMs,
-                    errorCode: 'AI_PROVIDER_UNAVAILABLE',
-                    errorMessage: 'OpenAI request failed: ' . $response->status()
+                return config('services.ai.demo_fallback_enabled')
+                    ? $this->demoResult($request, $startedAt, $model)
+                    : $this->failure(
+                        $startedAt,
+                        $model,
+                        'AI_PROVIDER_UNAVAILABLE',
+                        'The AI provider is temporarily unavailable.'
+                    );
+            }
+
+            $content = $response->json('choices.0.message.content');
+            $parsed = is_string($content) ? json_decode($content, true) : null;
+            $tasks = is_array($parsed)
+                ? $this->normalizer->normalize(
+                    is_array($parsed['tasks'] ?? null) ? $parsed['tasks'] : [],
+                    $request->maximumTasks()
+                )
+                : [];
+
+            if ($tasks === []) {
+                return $this->failure(
+                    $startedAt,
+                    $model,
+                    'AI_INVALID_RESPONSE',
+                    'The AI provider returned an invalid task list.'
                 );
             }
 
-            $body = $response->json();
-            $content = $body['choices'][0]['message']['content'] ?? '{}';
-            $parsed = json_decode($content, true);
-
-            $rawTasks = $parsed['tasks'] ?? [];
-            $normalizedTasks = $this->normalizeTasks($rawTasks);
-
             return new TaskBreakdownResult(
                 success: true,
-                tasks: $normalizedTasks,
+                tasks: $tasks,
                 provider: 'openai',
                 model: $model,
-                latencyMs: $latencyMs
+                latencyMs: $this->latency($startedAt)
             );
-        } catch (\Throwable $e) {
-            $latencyMs = (int) ((microtime(true) - $startTime) * 1000);
-            Log::error('OpenAI exception', ['exception' => $e->getMessage()]);
+        } catch (ConnectionException) {
+            return $this->failure(
+                $startedAt,
+                $model,
+                'AI_REQUEST_TIMEOUT',
+                'The AI request timed out.'
+            );
+        } catch (\Throwable $exception) {
+            Log::error('Unexpected AI provider exception', [
+                'provider' => 'openai',
+                'exception_class' => $exception::class,
+            ]);
 
-            if (env('AI_DEMO_FALLBACK_ENABLED', false)) {
-                return $this->getDemoFallbackResult($startTime, 'openai', $model);
-            }
-
-            return new TaskBreakdownResult(
-                success: false,
-                provider: 'openai',
-                model: $model,
-                latencyMs: $latencyMs,
-                errorCode: 'AI_REQUEST_TIMEOUT',
-                errorMessage: $e->getMessage()
+            return $this->failure(
+                $startedAt,
+                $model,
+                'AI_PROVIDER_UNAVAILABLE',
+                'The AI provider is temporarily unavailable.'
             );
         }
     }
 
-    private function buildPrompt(string $brief, array $preferences): string
+    private function buildPrompt(TaskBreakdownRequestData $request): string
     {
-        $maxTasks = $preferences['maximum_tasks'] ?? 15;
-        return <<<PROMPT
-Given the following client brief:
-"{$brief}"
+        $preferences = json_encode($request->preferences, JSON_THROW_ON_ERROR);
 
-Generate a list of up to {$maxTasks} software development tasks.
-Respond with JSON format strictly matching this structure:
-{
-  "tasks": [
-    {
-      "title": "Short descriptive title",
-      "description": "Detailed implementation note",
-      "category": "frontend|backend|design|qa|devops|management|other",
-      "estimated_hours": 8.0,
-      "priority": "low|medium|high|urgent",
-      "acceptance_criteria": ["Criterion 1", "Criterion 2"]
-    }
-  ]
-}
+        return <<<PROMPT
+Client brief:
+{$request->brief}
+
+Preferences: {$preferences}
+Generate at most {$request->maximumTasks()} tasks. Each task must include title,
+description, category, estimated_hours, priority, and acceptance_criteria.
+Allowed categories: frontend, backend, design, qa, devops, management, other.
+Allowed priorities: low, medium, high, urgent.
 PROMPT;
     }
 
-    private function normalizeTasks(array $rawTasks): array
-    {
-        $validCategories = ['frontend', 'backend', 'design', 'qa', 'devops', 'management', 'other'];
-        $validPriorities = ['low', 'medium', 'high', 'urgent'];
-        $items = [];
-        $index = 1;
-
-        foreach ($rawTasks as $raw) {
-            if (empty($raw['title'])) continue;
-
-            $category = strtolower($raw['category'] ?? 'other');
-            if (!in_array($category, $validCategories)) $category = 'other';
-
-            $priority = strtolower($raw['priority'] ?? 'medium');
-            if (!in_array($priority, $validPriorities)) $priority = 'medium';
-
-            $hours = (float) ($raw['estimated_hours'] ?? 4.0);
-            if ($hours < 0.5) $hours = 0.5;
-            if ($hours > 80) $hours = 80;
-
-            $items[] = (new TaskBreakdownItemData(
-                temporaryId: 'ai-task-' . $index++,
-                title: substr(trim($raw['title']), 0, 255),
-                description: $raw['description'] ?? null,
-                category: $category,
-                estimatedHours: $hours,
-                priority: $priority,
-                acceptanceCriteria: is_array($raw['acceptance_criteria'] ?? null) ? $raw['acceptance_criteria'] : []
-            ))->toArray();
-        }
-
-        return $items;
-    }
-
-    private function getDemoFallbackResult(float $startTime, string $provider, string $model): TaskBreakdownResult
-    {
-        $latencyMs = (int) ((microtime(true) - $startTime) * 1000);
-        $fallbackTasks = [
-            [
-                'temporary_id' => 'demo-task-1',
-                'title' => 'Design & Wireframe Application Architecture',
-                'description' => 'Create user interface layouts, database schema definitions, and system wireframes.',
-                'category' => 'design',
-                'estimated_hours' => 8.0,
-                'priority' => 'high',
-                'acceptance_criteria' => ['Wireframes approved by client', 'UI design tokens established']
-            ],
-            [
-                'temporary_id' => 'demo-task-2',
-                'title' => 'Implement Database Migrations & Models',
-                'description' => 'Set up database tables for clients, projects, tasks, time logs, and authentication.',
-                'category' => 'backend',
-                'estimated_hours' => 10.0,
-                'priority' => 'high',
-                'acceptance_criteria' => ['Migrations execute without error', 'Eloquent relations tested']
-            ],
-            [
-                'temporary_id' => 'demo-task-3',
-                'title' => 'Build Authentication API & Role Controls',
-                'description' => 'Implement Sanctum token login, registration, logout, and policy authorization.',
-                'category' => 'backend',
-                'estimated_hours' => 6.0,
-                'priority' => 'urgent',
-                'acceptance_criteria' => ['Sanctum token generation verified', 'Admin vs member policies active']
-            ],
-            [
-                'temporary_id' => 'demo-task-4',
-                'title' => 'Develop Web Admin Dashboard & Task Kanban',
-                'description' => 'Build Next.js web dashboard, client/project management forms, and drag-and-drop Kanban.',
-                'category' => 'frontend',
-                'estimated_hours' => 12.0,
-                'priority' => 'medium',
-                'acceptance_criteria' => ['Dashboard statistics rendering', 'Kanban state transitions synced with API']
-            ],
-            [
-                'temporary_id' => 'demo-task-5',
-                'title' => 'Develop Mobile Member App (Ionic React)',
-                'description' => 'Build mobile task list, task status update view, progress notes, and time log modal.',
-                'category' => 'frontend',
-                'estimated_hours' => 12.0,
-                'priority' => 'medium',
-                'acceptance_criteria' => ['Mobile layout responsive on Android', 'Member task isolation enforced']
-            ],
-        ];
-
+    private function demoResult(
+        TaskBreakdownRequestData $request,
+        float $startedAt,
+        string $model
+    ): TaskBreakdownResult {
         return new TaskBreakdownResult(
             success: true,
-            tasks: $fallbackTasks,
-            provider: $provider,
+            tasks: $this->normalizer->normalize(
+                $this->normalizer->demoTasks(),
+                $request->maximumTasks()
+            ),
+            provider: 'openai',
             model: $model,
-            latencyMs: $latencyMs,
+            latencyMs: $this->latency($startedAt),
             source: 'demo_fallback'
         );
+    }
+
+    private function failure(
+        float $startedAt,
+        string $model,
+        string $code,
+        string $message
+    ): TaskBreakdownResult {
+        return new TaskBreakdownResult(
+            success: false,
+            provider: 'openai',
+            model: $model,
+            latencyMs: $this->latency($startedAt),
+            errorCode: $code,
+            errorMessage: $message
+        );
+    }
+
+    private function latency(float $startedAt): int
+    {
+        return (int) ((microtime(true) - $startedAt) * 1000);
     }
 }

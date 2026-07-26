@@ -1,46 +1,33 @@
-# ProjectPulse AI Task Breakdown Integration
+# AI task-breakdown integration
 
-## Overview
+`TaskBreakdownProviderInterface` isolates provider transport from `TaskBreakdownService`. The service currently supports OpenAI and Gemini selected by `AI_PROVIDER`.
 
-ProjectPulse features an AI Task Breakdown assistant that converts client briefs into actionable, categorized project tasks.
+## Flow
 
----
+1. Admin submits a bounded client brief and generation preferences.
+2. The service creates a pending `ai_task_generations` audit row.
+3. The selected provider requests JSON with a timeout and bounded retry.
+4. `TaskBreakdownNormalizer` validates arrays, truncates text, maps enums, bounds effort, limits task count, and assigns temporary IDs.
+5. The API returns editable suggestions and the real audit generation ID.
+6. The admin edits/removes/adds suggestions in the web review dialog.
+7. Only `POST /projects/{project}/tasks/bulk` persists the reviewed list in a transaction.
 
-## Provider Abstraction Architecture
+AI failure never rolls back project creation or disables manual task CRUD.
 
-```php
-interface TaskBreakdownProviderInterface
-{
-    public function generate(TaskBreakdownRequestData $request): TaskBreakdownResult;
-}
-```
+## Configuration
 
-Implementations:
-- `OpenAITaskBreakdownProvider`: Connects to OpenAI API using structured JSON output prompts.
-- `GeminiTaskBreakdownProvider`: Connects to Google Gemini REST API using structured JSON responses.
-
-Configuration via `.env`:
 ```env
 AI_PROVIDER=openai
-AI_MODEL=gpt-4o-mini
-AI_API_KEY=your-api-key-here
 AI_TIMEOUT_SECONDS=20
-AI_MAX_RETRIES=2
-AI_MAX_TASKS=20
 AI_DEMO_FALLBACK_ENABLED=false
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-2.0-flash
 ```
 
----
+`AI_DEMO_FALLBACK_ENABLED=true` produces deterministic reviewable suggestions when credentials are absent. It is intended for offline demos, not to pretend a provider call occurred; the response includes its source.
 
-## Safety & Resiliency Guarantees
+## Failure contract
 
-1. **Schema Validation & Normalization**:
-   - AI raw response is validated against strict JSON schema.
-   - Category is normalized into one of `frontend`, `backend`, `design`, `qa`, `devops`, `management`, `other`.
-   - Priority is mapped to `low`, `medium`, `high`, `urgent`.
-   - Estimated hours are bounded between 0.5 and 80 hours.
-2. **Audit Logging**:
-   - Every AI request attempt is stored in `ai_task_generations` with SHA256 brief hash, latency, status (`success`, `failed`, `timeout`), provider, model, and error message. No sensitive API keys are logged.
-3. **Non-Blocking User Experience**:
-   - If AI fails or times out, the backend returns HTTP 503 / HTTP 200 (with `AI_PROVIDER_UNAVAILABLE` error payload).
-   - Project creation is never aborted due to AI failure. Admin can review, modify, or manually add tasks.
+Provider configuration, timeout, transport, malformed JSON, and invalid response failures update the audit row and return a generic 503 API envelope. Secrets and raw HTTP exception bodies are not returned or logged.

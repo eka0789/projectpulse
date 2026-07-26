@@ -2,10 +2,12 @@ apiVersion: v1
 kind: Service
 metadata:
   name: projectpulse-web
+  namespace: projectpulse
 spec:
   selector:
-    app: projectpulse-web
+    app.kubernetes.io/name: projectpulse-web
   ports:
-    - port: 3000
-      targetPort: 3000
+    - name: http
+      port: 3000
+      targetPort: http
   type: ClusterIP

@@ -35,4 +35,18 @@ return [
         ],
     ],
 
+    'ai' => [
+        'provider' => env('AI_PROVIDER', 'openai'),
+        'timeout_seconds' => (int) env('AI_TIMEOUT_SECONDS', 20),
+        'demo_fallback_enabled' => (bool) env('AI_DEMO_FALLBACK_ENABLED', false),
+        'openai' => [
+            'api_key' => env('OPENAI_API_KEY', env('AI_API_KEY')),
+            'model' => env('OPENAI_MODEL', env('AI_MODEL', 'gpt-4o-mini')),
+        ],
+        'gemini' => [
+            'api_key' => env('GEMINI_API_KEY', env('AI_API_KEY')),
+            'model' => env('GEMINI_MODEL', env('AI_MODEL', 'gemini-2.0-flash')),
+        ],
+    ],
+
 ];

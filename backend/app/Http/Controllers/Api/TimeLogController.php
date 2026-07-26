@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\TimeLog\StoreTimeLogRequest;
+use App\Http\Requests\TimeLog\UpdateTimeLogRequest;
+use App\Http\Resources\TimeLogResource;
 use App\Models\Task;
 use App\Models\TimeLog;
 use Illuminate\Http\JsonResponse;
@@ -19,7 +22,7 @@ class TimeLogController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized action.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
 
@@ -28,36 +31,28 @@ class TimeLogController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Time logs retrieved successfully.',
-            'data' => $timeLogs,
+            'data' => TimeLogResource::collection($timeLogs),
             'meta' => null,
         ]);
     }
 
-    public function store(Request $request, int $taskId): JsonResponse
+    public function store(StoreTimeLogRequest $request, int $taskId): JsonResponse
     {
         $task = Task::findOrFail($taskId);
         $user = $request->user();
 
-        if ($user->isMember() && $task->assignee_id !== $user->id) {
+        if ($task->assignee_id !== $user->id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Members can only log time for tasks assigned to them.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'message' => 'Time can only be logged by the assigned member.',
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
-
-        $request->validate([
-            'work_date' => 'required|date|before_or_equal:today',
-            'duration_minutes' => 'required|integer|min:1|max:1440',
-            'note' => 'nullable|string',
-        ]);
 
         $timeLog = TimeLog::create([
             'task_id' => $task->id,
             'user_id' => $user->id,
-            'work_date' => $request->work_date,
-            'duration_minutes' => $request->duration_minutes,
-            'note' => $request->note,
+            ...$request->validated(),
         ]);
 
         $timeLog->load('user');
@@ -65,12 +60,12 @@ class TimeLogController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Time log created successfully.',
-            'data' => $timeLog,
+            'data' => new TimeLogResource($timeLog),
             'meta' => null,
         ], 201);
     }
 
-    public function update(Request $request, int $id): JsonResponse
+    public function update(UpdateTimeLogRequest $request, int $id): JsonResponse
     {
         $timeLog = TimeLog::findOrFail($id);
         $user = $request->user();
@@ -79,22 +74,16 @@ class TimeLogController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized action.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
 
-        $request->validate([
-            'work_date' => 'sometimes|required|date|before_or_equal:today',
-            'duration_minutes' => 'sometimes|required|integer|min:1|max:1440',
-            'note' => 'nullable|string',
-        ]);
-
-        $timeLog->update($request->only(['work_date', 'duration_minutes', 'note']));
+        $timeLog->update($request->validated());
 
         return response()->json([
             'success' => true,
             'message' => 'Time log updated successfully.',
-            'data' => $timeLog,
+            'data' => new TimeLogResource($timeLog),
             'meta' => null,
         ]);
     }
@@ -108,7 +97,7 @@ class TimeLogController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized action.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
 

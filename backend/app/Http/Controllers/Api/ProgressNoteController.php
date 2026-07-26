@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\ProgressNote\StoreProgressNoteRequest;
+use App\Http\Requests\ProgressNote\UpdateProgressNoteRequest;
+use App\Http\Resources\ProgressNoteResource;
 use App\Models\ProgressNote;
 use App\Models\Task;
 use Illuminate\Http\JsonResponse;
@@ -19,7 +22,7 @@ class ProgressNoteController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized action.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
 
@@ -28,12 +31,12 @@ class ProgressNoteController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Progress notes retrieved successfully.',
-            'data' => $notes,
+            'data' => ProgressNoteResource::collection($notes),
             'meta' => null,
         ]);
     }
 
-    public function store(Request $request, int $taskId): JsonResponse
+    public function store(StoreProgressNoteRequest $request, int $taskId): JsonResponse
     {
         $task = Task::findOrFail($taskId);
         $user = $request->user();
@@ -42,13 +45,9 @@ class ProgressNoteController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Unauthorized action.',
-                'error' => ['code' => 'FORBIDDEN', 'details' => null]
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
             ], 403);
         }
-
-        $request->validate([
-            'note' => 'required|string|min:3',
-        ]);
 
         $progressNote = ProgressNote::create([
             'task_id' => $task->id,
@@ -62,8 +61,61 @@ class ProgressNoteController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Progress note created successfully.',
-            'data' => $progressNote,
+            'data' => new ProgressNoteResource($progressNote),
             'meta' => null,
         ], 201);
+    }
+
+    public function update(UpdateProgressNoteRequest $request, int $id): JsonResponse
+    {
+        $progressNote = ProgressNote::with('task')->findOrFail($id);
+        $user = $request->user();
+
+        if ($user->isMember() && (
+            $progressNote->user_id !== $user->id
+            || $progressNote->task->assignee_id !== $user->id
+        )) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You can only update your own progress notes.',
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
+            ], 403);
+        }
+
+        $progressNote->update(['note' => $request->string('note')->toString()]);
+        $progressNote->load('user');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Progress note updated successfully.',
+            'data' => new ProgressNoteResource($progressNote),
+            'meta' => null,
+        ]);
+    }
+
+    public function destroy(Request $request, int $id): JsonResponse
+    {
+        $progressNote = ProgressNote::with('task')->findOrFail($id);
+        $user = $request->user();
+
+        if ($user->isMember() && (
+            $progressNote->user_id !== $user->id
+            || $progressNote->task->assignee_id !== $user->id
+        )) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You can only delete your own progress notes.',
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
+            ], 403);
+        }
+
+        $progressNote->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Progress note deleted successfully.',
+            'data' => null,
+            'meta' => null,
+        ]);
     }
 }

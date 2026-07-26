@@ -4,6 +4,7 @@ namespace App\Services\Dashboard;
 
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TimeLog;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -34,48 +35,50 @@ class DashboardService
             $tasksDueThisWeekQuery->where('assignee_id', $user->id);
         }
 
-        $taskDistribution = [
-            'todo' => Task::where('status', 'todo')->count(),
-            'in_progress' => Task::where('status', 'in_progress')->count(),
-            'review' => Task::where('status', 'review')->count(),
-            'done' => Task::where('status', 'done')->count(),
-        ];
+        $taskCounts = Task::query()
+            ->select('status', DB::raw('COUNT(*) as aggregate'))
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+        $taskDistribution = collect(['todo', 'in_progress', 'review', 'done'])
+            ->mapWithKeys(fn (string $status): array => [
+                $status => (int) ($taskCounts[$status] ?? 0),
+            ])
+            ->all();
 
-        // Member workloads
-        $members = User::where('role', 'member')->where('is_active', true)->get();
-        $memberWorkloads = $members->map(function ($member) use ($today) {
-            $activeTasks = Task::where('assignee_id', $member->id)
-                ->where('status', '!=', 'done')
-                ->count();
-
-            $estimatedHours = Task::where('assignee_id', $member->id)
-                ->where('status', '!=', 'done')
-                ->sum('estimated_hours');
-
-            $loggedMinutes = DB::table('time_logs')
-                ->join('tasks', 'time_logs.task_id', '=', 'tasks.id')
-                ->where('tasks.assignee_id', $member->id)
-                ->sum('duration_minutes');
-
-            $overdueCount = Task::where('assignee_id', $member->id)
-                ->where('status', '!=', 'done')
-                ->whereNotNull('deadline')
-                ->where('deadline', '<', $today)
-                ->count();
-
+        $loggedMinutesByUser = TimeLog::query()
+            ->select('user_id', DB::raw('SUM(duration_minutes) as aggregate'))
+            ->groupBy('user_id')
+            ->pluck('aggregate', 'user_id');
+        $members = User::query()
+            ->where('role', 'member')
+            ->where('is_active', true)
+            ->withCount([
+                'assignedTasks as active_tasks' => fn ($query) => $query->where('status', '!=', 'done'),
+                'assignedTasks as overdue_tasks' => fn ($query) => $query
+                    ->where('status', '!=', 'done')
+                    ->whereNotNull('deadline')
+                    ->where('deadline', '<', $today),
+            ])
+            ->withSum(
+                ['assignedTasks as estimated_hours' => fn ($query) => $query->where('status', '!=', 'done')],
+                'estimated_hours'
+            )
+            ->get();
+        $memberWorkloads = $members->map(function ($member) use ($loggedMinutesByUser) {
             return [
                 'user_id' => $member->id,
                 'name' => $member->name,
                 'avatar_url' => $member->avatar_url,
                 'job_title' => $member->job_title,
-                'active_tasks' => $activeTasks,
-                'estimated_hours' => (float) $estimatedHours,
-                'logged_hours' => round($loggedMinutes / 60, 1),
-                'overdue_tasks' => $overdueCount,
+                'active_tasks' => $member->active_tasks,
+                'estimated_hours' => (float) ($member->estimated_hours ?? 0),
+                'logged_hours' => round(((int) ($loggedMinutesByUser[$member->id] ?? 0)) / 60, 1),
+                'overdue_tasks' => $member->overdue_tasks,
             ];
         });
 
         $recentProjects = Project::with('client')
+            ->withCount('tasks')
             ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get()
@@ -87,7 +90,7 @@ class DashboardService
                     'company' => $project->client->company ?? 'N/A',
                     'status' => $project->status,
                     'deadline' => $project->deadline ? $project->deadline->format('Y-m-d') : null,
-                    'task_count' => $project->tasks()->count(),
+                    'task_count' => $project->tasks_count,
                 ];
             });
 

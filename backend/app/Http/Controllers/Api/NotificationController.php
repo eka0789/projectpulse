@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\NotificationResource;
 use App\Models\Notification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -11,20 +12,21 @@ class NotificationController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $perPage = max(1, min($request->integer('per_page', 20), 100));
         $notifications = Notification::where('user_id', $request->user()->id)
             ->orderBy('created_at', 'desc')
-            ->paginate($request->get('per_page', 20));
+            ->paginate($perPage);
 
         return response()->json([
             'success' => true,
             'message' => 'Notifications retrieved successfully.',
-            'data' => $notifications->items(),
+            'data' => NotificationResource::collection($notifications->getCollection()),
             'meta' => [
                 'current_page' => $notifications->currentPage(),
                 'per_page' => $notifications->perPage(),
                 'total' => $notifications->total(),
                 'last_page' => $notifications->lastPage(),
-            ]
+            ],
         ]);
     }
 
@@ -53,7 +55,7 @@ class NotificationController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Notification marked as read.',
-            'data' => $notification,
+            'data' => new NotificationResource($notification),
             'meta' => null,
         ]);
     }

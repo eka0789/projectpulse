@@ -21,17 +21,18 @@ class HealthController extends Controller
     {
         try {
             DB::connection()->getPdo();
+
             return response()->json([
                 'status' => 'ready',
                 'database' => 'connected',
                 'service' => 'projectpulse-backend',
                 'timestamp' => now()->toIso8601String(),
             ]);
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             return response()->json([
                 'status' => 'error',
                 'database' => 'disconnected',
-                'message' => $e->getMessage(),
+                'message' => 'A required dependency is unavailable.',
             ], 503);
         }
     }

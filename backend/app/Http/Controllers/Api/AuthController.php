@@ -3,42 +3,40 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\RegisterRequest;
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
-    public function login(Request $request): JsonResponse
+    public function login(LoginRequest $request): JsonResponse
     {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|string',
-        ]);
+        $credentials = $request->validated();
+        $user = User::where('email', $credentials['email'])->first();
 
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (! $user || ! Hash::check($credentials['password'], $user->password)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid email or password.',
                 'error' => [
                     'code' => 'UNAUTHENTICATED',
                     'details' => null,
-                ]
+                ],
             ], 401);
         }
 
-        if (!$user->is_active) {
+        if (! $user->is_active) {
             return response()->json([
                 'success' => false,
                 'message' => 'User account is deactivated.',
                 'error' => [
                     'code' => 'FORBIDDEN',
                     'details' => null,
-                ]
+                ],
             ], 403);
         }
 
@@ -50,35 +48,33 @@ class AuthController extends Controller
             'data' => [
                 'token' => $token,
                 'token_type' => 'Bearer',
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $user->role,
-                    'job_title' => $user->job_title,
-                    'avatar_url' => $user->avatar_url,
-                ]
+                'user' => new UserResource($user),
             ],
             'meta' => null,
         ]);
     }
 
-    public function register(Request $request): JsonResponse
+    public function register(RegisterRequest $request): JsonResponse
     {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8',
-            'role' => 'nullable|in:admin,member',
-            'job_title' => 'nullable|string|max:255',
-        ]);
+        if (! config('projectpulse.allow_public_registration')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Public registration is disabled.',
+                'error' => [
+                    'code' => 'FORBIDDEN',
+                    'details' => null,
+                ],
+            ], 403);
+        }
+
+        $data = $request->validated();
 
         $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'role' => $request->role ?? 'member',
-            'job_title' => $request->job_title ?? 'Developer',
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
+            'role' => 'member',
+            'job_title' => $data['job_title'] ?? 'Developer',
             'is_active' => true,
         ]);
 
@@ -90,13 +86,7 @@ class AuthController extends Controller
             'data' => [
                 'token' => $token,
                 'token_type' => 'Bearer',
-                'user' => [
-                    'id' => $user->id,
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'role' => $user->role,
-                    'job_title' => $user->job_title,
-                ]
+                'user' => new UserResource($user),
             ],
             'meta' => null,
         ], 201);
@@ -121,15 +111,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'User profile retrieved successfully.',
-            'data' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $user->role,
-                'job_title' => $user->job_title,
-                'avatar_url' => $user->avatar_url,
-                'is_active' => $user->is_active,
-            ],
+            'data' => new UserResource($user),
             'meta' => null,
         ]);
     }

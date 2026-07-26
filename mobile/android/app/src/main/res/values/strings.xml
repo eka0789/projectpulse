@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ProjectPulse</string>
+    <string name="title_activity_main">ProjectPulse</string>
+    <string name="package_name">com.projectpulse.app</string>
+    <string name="custom_url_scheme">com.projectpulse.app</string>
+</resources>

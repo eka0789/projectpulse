@@ -43,7 +43,7 @@ flowchart TD
 
 ### 1. Backend: Laravel (PHP 8.3+)
 - **Why**: Provides a mature, production-ready ecosystem for REST APIs with Sanctum for token authentication, built-in database migrations, Eloquent ORM, form requests validation, gate/policy authorization, queues, and task scheduling.
-- **Service Layer Pattern**: Business logic is separated from HTTP controllers into dedicated services (`TaskStateService`, `TaskBreakdownService`, `DashboardService`) to maintain thin controllers and single responsibility principles.
+- **Service Layer Pattern**: AI orchestration and dashboard aggregation live in focused services (`TaskBreakdownService`, provider implementations, and `DashboardService`). Simple resource operations remain explicit in controllers to avoid ceremonial abstractions.
 
 ### 2. Database: PostgreSQL
 - **Why**: Reliable ACID compliance, native JSONB support for logging AI task generation audits (`ai_task_generations`), expressive indexing capabilities, and high-performance aggregate operations for dashboard charts.
@@ -52,7 +52,7 @@ flowchart TD
 - **Why**: Modern full-featured web client structure with server/client state management using TanStack Query, React Hook Form + Zod schema validation, Tailwind CSS styling, Lucide icons, and dnd-kit for Kanban drag-and-drop.
 
 ### 4. Mobile: Ionic React / Capacitor
-- **Why**: Cross-platform single codebase for iOS and Android, leveraging React knowledge, Capacitor native device integrations, Ionic components, secure storage for auth tokens, and mobile-optimized UI primitives.
+- **Why**: Cross-platform single codebase for Android-first delivery, leveraging React, Capacitor native packaging, Ionic components/storage, and mobile-optimized UI primitives.
 
 ---
 
