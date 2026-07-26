@@ -1,46 +1,85 @@
-# Architecture Decision Document — ProjectPulse
+# ProjectPulse Architecture Document
 
-> Isi dokumen ini selama/setelah pengerjaan. Ini bagian yang dinilai reviewer untuk memahami keputusan teknis, bukan cuma kode yang jalan.
+## System Architecture Diagram
 
-## 1. Ringkasan Stack
+```mermaid
+flowchart TD
+    subgraph Clients
+        Web[Web Admin - Next.js]
+        Mobile[Mobile Member App - Ionic React]
+    end
 
-| Layer | Pilihan | Alasan singkat |
-|---|---|---|
-| Backend | Laravel / Next.js | |
-| Web | Next.js/React / Blade | |
-| Mobile | Ionic / React Native / Flutter | |
-| Database | | |
-| LLM Provider | OpenAI / Gemini / Hugging Face | |
+    subgraph Gateway & Security
+        Sanctum[Laravel Sanctum Middleware]
+        Policies[Laravel Gate & Policies]
+    end
 
-## 2. Alur Data Utama
+    subgraph Backend Core
+        Controllers[API Controllers]
+        Services[Service Layer]
+        TaskBreakdown[AI Task Breakdown Service]
+    end
 
-Jelaskan alur request untuk 1-2 fitur inti (mis. "admin bikin proyek dari brief klien" dan "member update status task") dari client sampai database.
+    subgraph External & Storage
+        DB[(PostgreSQL Database)]
+        LLM[OpenAI / Gemini API]
+        Scheduler[Laravel Cron Scheduler]
+    end
 
-## 3. Desain Skema Database
+    Web -->|HTTP / Bearer Token| Sanctum
+    Mobile -->|HTTP / Bearer Token| Sanctum
+    Sanctum --> Policies
+    Policies --> Controllers
+    Controllers --> Services
+    Services --> DB
+    Services --> TaskBreakdown
+    TaskBreakdown -->|Structured JSON| LLM
+    Scheduler -->|H-1 Deadline Check| Services
+```
 
-Diagram/daftar tabel & relasi (Client, Project, Task, User, TimeLog, dst) beserta alasan desainnya.
+---
 
-## 4. Integrasi ML — AI Task Breakdown
+## Technology Stack Rationale
 
-- Pendekatan prompt yang dipakai (few-shot / output JSON terstruktur / dsb).
-- Bagaimana output LLM divalidasi sebelum ditampilkan ke admin.
-- Bagaimana kegagalan/timeout LLM API ditangani (fallback ke input manual).
+### 1. Backend: Laravel (PHP 8.3+)
+- **Why**: Provides a mature, production-ready ecosystem for REST APIs with Sanctum for token authentication, built-in database migrations, Eloquent ORM, form requests validation, gate/policy authorization, queues, and task scheduling.
+- **Service Layer Pattern**: Business logic is separated from HTTP controllers into dedicated services (`TaskStateService`, `TaskBreakdownService`, `DashboardService`) to maintain thin controllers and single responsibility principles.
 
-## 5. Autentikasi & Otorisasi
+### 2. Database: PostgreSQL
+- **Why**: Reliable ACID compliance, native JSONB support for logging AI task generation audits (`ai_task_generations`), expressive indexing capabilities, and high-performance aggregate operations for dashboard charts.
 
-Bagaimana token auth bekerja lintas web-mobile, dan bagaimana role `admin`/`member` dibatasi di level API.
+### 3. Web Admin: Next.js (App Router) / React / TypeScript
+- **Why**: Modern full-featured web client structure with server/client state management using TanStack Query, React Hook Form + Zod schema validation, Tailwind CSS styling, Lucide icons, and dnd-kit for Kanban drag-and-drop.
 
-## 6. Containerization & Orchestration
+### 4. Mobile: Ionic React / Capacitor
+- **Why**: Cross-platform single codebase for iOS and Android, leveraging React knowledge, Capacitor native device integrations, Ionic components, secure storage for auth tokens, and mobile-optimized UI primitives.
 
-- Isi & alasan struktur `Dockerfile` di `backend/` dan `web/` (base image, multi-stage build kalau ada).
-- Cara menjalankan `docker-compose up` untuk dev lokal.
-- Cara deploy manifest di `k8s/` ke cluster lokal (minikube/kind/k3d) — termasuk cara mengakses service setelah deploy.
-- Kalau backend di-scale >1 replika, apa yang perlu dipastikan tetap benar (state, session, dsb)?
+---
 
-## 7. Error Handling & Resiliency
+## Core Data Flow
 
-Bagaimana sistem tetap berfungsi (fitur inti) saat LLM API gagal/timeout, dan bagaimana error ditampilkan ke user di web & mobile.
+```text
+Client (Web / Mobile)
+  │
+  ├── 1. Request with Bearer Token ──> Sanctum Middleware
+  │                                           │
+  ├── 2. Input Validation (Form Request) <────┤
+  │                                           │
+  ├── 3. Policy Authorization Check <─────────┤
+  │                                           │
+  ├── 4. Service Layer Execution <────────────┘
+  │         │
+  │         ├── DB Transaction / Eloquent ORM ──> PostgreSQL
+  │         └── Assistive AI Execution ─────────> OpenAI / Gemini API
+  │
+  └── 5. Formatted JSON Response <── API Resource Format
+```
 
-## 8. Trade-off & Keterbatasan
+---
 
-Hal yang disederhanakan/di-skip karena keterbatasan waktu 4 hari, dan bagaimana akan dikembangkan lebih lanjut kalau ada waktu tambahan.
+## AI Resilience & Non-Blocking Design
+
+1. AI serves strictly as an assistive tool to convert project client briefs into task breakdown suggestions.
+2. Generating tasks does not immediately insert records into the database. Suggestions are returned to the Admin web interface for review, edit, addition, or removal.
+3. If the LLM provider fails, times out (20s limit), or returns unparseable output, the backend returns a clean, structured `AI_PROVIDER_UNAVAILABLE` error message.
+4. Admin can bypass AI suggestions and manually create projects/tasks without obstruction.

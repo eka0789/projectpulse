@@ -1,37 +1,104 @@
 version: "3.9"
 
 services:
-  db:
+  postgres:
     image: postgres:16-alpine
+    container_name: projectpulse_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_DATABASE:-bilcode_projectpulse}
-      POSTGRES_USER: ${DB_USERNAME:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_DATABASE:-projectpulse}
+      POSTGRES_USER: ${DB_USERNAME:-projectpulse}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-projectpulse_secret}
     ports:
       - "5432:5432"
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-projectpulse} -d ${DB_DATABASE:-projectpulse}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
       context: ./backend
+      dockerfile: Dockerfile
+    container_name: projectpulse_backend
+    restart: unless-stopped
     env_file:
       - ./backend/.env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-projectpulse}
+      DB_USERNAME: ${DB_USERNAME:-projectpulse}
+      DB_PASSWORD: ${DB_PASSWORD:-projectpulse_secret}
     depends_on:
-      - db
+      postgres:
+        condition: service_healthy
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  queue:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: projectpulse_queue
+    restart: unless-stopped
+    command: php artisan queue:work --verbose --tries=3 --timeout=90
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-projectpulse}
+      DB_USERNAME: ${DB_USERNAME:-projectpulse}
+      DB_PASSWORD: ${DB_PASSWORD:-projectpulse_secret}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+
+  scheduler:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: projectpulse_scheduler
+    restart: unless-stopped
+    command: php artisan schedule:work
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-projectpulse}
+      DB_USERNAME: ${DB_USERNAME:-projectpulse}
+      DB_PASSWORD: ${DB_PASSWORD:-projectpulse_secret}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
 
   web:
     build:
       context: ./web
+      dockerfile: Dockerfile
+    container_name: projectpulse_web
+    restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "3000:3000"
 
 volumes:
-  db_data:
+  postgres_data:
