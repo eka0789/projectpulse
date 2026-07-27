@@ -17,34 +17,17 @@ import {
   notificationsOutline,
   personCircleOutline,
 } from "ionicons/icons";
-import { lazy, Suspense, useState } from "react";
+import { useState } from "react";
 import { Redirect, Route } from "react-router-dom";
 
 import { AuthProvider } from "./auth/AuthProvider";
 import { useAuth } from "./auth/auth-context";
+import { LoginPage } from "./pages/LoginPage";
+import { NotificationsPage } from "./pages/NotificationsPage";
+import { ProfilePage } from "./pages/ProfilePage";
+import { TaskDetailPage } from "./pages/TaskDetailPage";
+import { TasksPage } from "./pages/TasksPage";
 import { listNotifications } from "./services/api";
-
-const LoginPage = lazy(() =>
-  import("./pages/LoginPage").then((module) => ({ default: module.LoginPage })),
-);
-const NotificationsPage = lazy(() =>
-  import("./pages/NotificationsPage").then((module) => ({
-    default: module.NotificationsPage,
-  })),
-);
-const ProfilePage = lazy(() =>
-  import("./pages/ProfilePage").then((module) => ({
-    default: module.ProfilePage,
-  })),
-);
-const TaskDetailPage = lazy(() =>
-  import("./pages/TaskDetailPage").then((module) => ({
-    default: module.TaskDetailPage,
-  })),
-);
-const TasksPage = lazy(() =>
-  import("./pages/TasksPage").then((module) => ({ default: module.TasksPage })),
-);
 
 function MemberTabs() {
   const notifications = useQuery({
@@ -79,13 +62,11 @@ function Routes() {
   if (!ready) return <IonLoading isOpen message="Restoring your session…" />;
   return (
     <IonReactRouter>
-      <Suspense fallback={<IonLoading isOpen message="Loading view…" />}>
-        <IonRouterOutlet>
-          <Route exact path="/login" component={LoginPage} />
-          <Route path="/app" render={() => user ? <MemberTabs /> : <Redirect to="/login" />} />
-          <Redirect exact from="/" to={user ? "/app/tasks" : "/login"} />
-        </IonRouterOutlet>
-      </Suspense>
+      <IonRouterOutlet>
+        <Route exact path="/login" component={LoginPage} />
+        <Route path="/app" render={() => user ? <MemberTabs /> : <Redirect to="/login" />} />
+        <Redirect exact from="/" to={user ? "/app/tasks" : "/login"} />
+      </IonRouterOutlet>
     </IonReactRouter>
   );
 }

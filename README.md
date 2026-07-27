@@ -2,6 +2,31 @@
 
 ProjectPulse is a full-stack internal delivery platform for client, project, task, and team-productivity management. It includes a Next.js admin workspace, an Ionic/Capacitor member app, and a shared Laravel API backed by PostgreSQL.
 
+## Screenshots
+
+### Admin Web Dashboard
+
+| Overview | Projects |
+|:---:|:---:|
+| ![Overview](images/admin/1_overview_page.jpg) | ![Projects](images/admin/2_projects_page.jpg) |
+| Live delivery dashboard with task flow chart, team workload, and key metrics. | Project portfolio with search, AI-assisted task breakdown, and status badges. |
+
+| Tasks (Kanban) | Clients |
+|:---:|:---:|
+| ![Tasks](images/admin/3_tasks_page.jpg) | ![Clients](images/admin/4_clients_page.jpg) |
+| Drag-and-drop Kanban board with priority labels, assignees, and project filters. | Client directory with contact details, linked projects, and quick actions. |
+
+| Team Members | Time Reports |
+|:---:|:---:|
+| ![Team](images/admin/5_team_page.jpg) | ![Time Reports](images/admin/6_timereports_page.jpg) |
+| Team management with role badges, status indicators, and access controls. | Recorded effort table with total hours, CSV and PDF export. |
+
+### Member Mobile App
+
+![Mobile App](images/member/1_mobile_page.png)
+
+From left to right: **Login** screen, **My Tasks** list with status filter chips, **Completed** history, **Notifications** with assignment alerts, and **Profile** with session management.
+
 ## What is implemented
 
 - Admin web: token login, live dashboard, client/project/member CRUD, AI task-breakdown review, task CRUD, drag-and-drop Kanban, time reports with CSV export, and notifications.
