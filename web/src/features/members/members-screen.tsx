@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LoaderCircle, Pencil, Plus, Search, UserMinus, Users } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import { Field, PageHeader, ResourceEmpty, ResourceError } from "@/components/resource-states";
@@ -46,7 +47,6 @@ export function MembersScreen() {
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Member | null>(null);
   const [open, setOpen] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(search);
   const members = useQuery({
     queryKey: ["members", debouncedSearch],
@@ -72,17 +72,17 @@ export function MembersScreen() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["members"] });
       setOpen(false);
-      setFeedback("Team member saved successfully.");
+      toast.success("Team member saved successfully.");
     },
-    onError: (error) => setFeedback(error instanceof Error ? error.message : getApiErrorMessage(error)),
+    onError: (error) => toast.error(error instanceof Error ? error.message : getApiErrorMessage(error)),
   });
   const deactivate = useMutation({
     mutationFn: membersApi.deactivate,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["members"] });
-      setFeedback("Account deactivated and its tokens revoked.");
+      toast.success("Account deactivated and its tokens revoked.");
     },
-    onError: (error) => setFeedback(getApiErrorMessage(error)),
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
 
   function createMember() {
@@ -107,7 +107,6 @@ export function MembersScreen() {
   return (
     <div className="mx-auto max-w-[1480px] space-y-6">
       <PageHeader eyebrow="People and access" title="Team members" description="Create accounts, manage roles, and deactivate access. Backend rules prevent removal of the last administrator." action={<Button onClick={createMember}><Plus className="size-4" />Add member</Button>} />
-      {feedback ? <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900" role="status">{feedback}</div> : null}
       <Card className="p-4">
         <label className="relative block max-w-md"><span className="sr-only">Search members</span><Search className="absolute left-3.5 top-3.5 size-5 text-slate-400" /><Input className="pl-11" placeholder="Search name, email, or job title" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
       </Card>

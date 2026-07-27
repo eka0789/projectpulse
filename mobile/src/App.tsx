@@ -15,6 +15,7 @@ import {
   checkmarkDoneOutline,
   listOutline,
   notificationsOutline,
+  personCircleOutline,
 } from "ionicons/icons";
 import { lazy, Suspense, useState } from "react";
 import { Redirect, Route } from "react-router-dom";
@@ -29,6 +30,11 @@ const LoginPage = lazy(() =>
 const NotificationsPage = lazy(() =>
   import("./pages/NotificationsPage").then((module) => ({
     default: module.NotificationsPage,
+  })),
+);
+const ProfilePage = lazy(() =>
+  import("./pages/ProfilePage").then((module) => ({
+    default: module.ProfilePage,
   })),
 );
 const TaskDetailPage = lazy(() =>
@@ -55,12 +61,14 @@ function MemberTabs() {
         <Route exact path="/app/tasks/:id" component={TaskDetailPage} />
         <Route exact path="/app/history" render={() => <TasksPage historyMode />} />
         <Route exact path="/app/notifications" component={NotificationsPage} />
+        <Route exact path="/app/profile" component={ProfilePage} />
         <Redirect exact from="/app" to="/app/tasks" />
       </IonRouterOutlet>
       <IonTabBar slot="bottom">
         <IonTabButton tab="tasks" href="/app/tasks"><IonIcon icon={listOutline} /><IonLabel>Tasks</IonLabel></IonTabButton>
         <IonTabButton tab="history" href="/app/history"><IonIcon icon={checkmarkDoneOutline} /><IonLabel>History</IonLabel></IonTabButton>
         <IonTabButton tab="notifications" href="/app/notifications"><IonIcon icon={notificationsOutline} />{unread > 0 ? <IonBadge>{unread > 99 ? "99+" : unread}</IonBadge> : null}<IonLabel>Alerts</IonLabel></IonTabButton>
+        <IonTabButton tab="profile" href="/app/profile"><IonIcon icon={personCircleOutline} /><IonLabel>Profile</IonLabel></IonTabButton>
       </IonTabBar>
     </IonTabs>
   );

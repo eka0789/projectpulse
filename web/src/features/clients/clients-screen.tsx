@@ -3,8 +3,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, LoaderCircle, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import {
@@ -55,7 +57,6 @@ export function ClientsScreen() {
   const [page, setPage] = useState(1);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(search);
   const clients = useQuery({
     queryKey: ["clients", debouncedSearch, page],
@@ -78,27 +79,26 @@ export function ClientsScreen() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["clients"] });
-      setFeedback(editing ? "Client updated successfully." : "Client created successfully.");
+      toast.success(editing ? "Client updated successfully." : "Client created successfully.");
       setDialogOpen(false);
       setEditing(null);
       form.reset(emptyForm);
     },
-    onError: (error) => setFeedback(getApiErrorMessage(error)),
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
 
   const removeClient = useMutation({
     mutationFn: clientsApi.remove,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["clients"] });
-      setFeedback("Client removed successfully.");
+      toast.success("Client removed successfully.");
     },
-    onError: (error) => setFeedback(getApiErrorMessage(error)),
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
 
   function openCreate() {
     setEditing(null);
     form.reset(emptyForm);
-    setFeedback(null);
     setDialogOpen(true);
   }
 
@@ -112,7 +112,6 @@ export function ClientsScreen() {
       address: client.address ?? "",
       notes: client.notes ?? "",
     });
-    setFeedback(null);
     setDialogOpen(true);
   }
 
@@ -129,12 +128,6 @@ export function ClientsScreen() {
           </Button>
         }
       />
-
-      {feedback ? (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900" role="status">
-          {feedback}
-        </div>
-      ) : null}
 
       <Card>
         <CardContent className="p-4 sm:p-5">
@@ -183,15 +176,18 @@ export function ClientsScreen() {
                     {clients.data.data.map((client) => (
                       <tr key={client.id} className="border-b border-slate-100 last:border-0">
                         <td className="px-5 py-4">
-                          <div className="flex items-center gap-3">
+                          <Link
+                            href={`/clients/${client.id}`}
+                            className="flex items-center gap-3"
+                          >
                             <span className="grid size-10 place-items-center rounded-xl bg-blue-50 text-blue-700">
                               <Building2 className="size-5" />
                             </span>
                             <div>
-                              <p className="font-semibold text-slate-950">{client.company}</p>
+                              <p className="font-semibold text-slate-950 hover:underline">{client.company}</p>
                               <p className="text-xs text-slate-500">{client.name}</p>
                             </div>
-                          </div>
+                          </Link>
                         </td>
                         <td className="px-5 py-4 text-slate-600">
                           <p>{client.email ?? "No email"}</p>

@@ -9,6 +9,7 @@ export type Client = {
   address: string | null;
   notes: string | null;
   projects_count?: number;
+  projects?: Project[];
   created_at: string;
   updated_at: string;
 };
@@ -32,6 +33,7 @@ export type Project = {
   client?: Client;
   creator?: AuthUser;
   tasks_count?: number;
+  tasks?: Task[];
   created_at: string;
   updated_at: string;
 };
@@ -65,6 +67,43 @@ export type Task = {
   project?: Project;
   assignee?: AuthUser;
   creator?: AuthUser;
+  time_logs?: TimeLog[];
+  progress_notes?: ProgressNote[];
+  comments?: TaskComment[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type TimeLog = {
+  id: number;
+  task_id: number;
+  user_id: number;
+  work_date: string;
+  duration_minutes: number;
+  note: string | null;
+  user?: AuthUser;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProgressNote = {
+  id: number;
+  task_id: number;
+  user_id: number;
+  note: string;
+  status_snapshot: TaskStatus;
+  user?: AuthUser;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TaskComment = {
+  id: number;
+  task_id: number;
+  user_id: number;
+  body: string;
+  edited_at: string | null;
+  user?: AuthUser;
   created_at: string;
   updated_at: string;
 };

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Clock3, Download, FileSpreadsheet, LoaderCircle } from "lucide-react";
+import { toast } from "sonner";
 
 import { PageHeader, ResourceEmpty, ResourceError } from "@/components/resource-states";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,9 @@ export function ReportsScreen() {
       anchor.download = "projectpulse-time-logs.csv";
       anchor.click();
       URL.revokeObjectURL(url);
+      toast.success("Report exported successfully.");
     },
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
 
   return (
@@ -40,7 +43,6 @@ export function ReportsScreen() {
           </Button>
         }
       />
-      {download.isError ? <p className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{getApiErrorMessage(download.error)}</p> : null}
       {report.isPending ? (
         <><div className="grid gap-4 sm:grid-cols-2">{[0,1].map((item) => <Skeleton key={item} className="h-32" />)}</div><Skeleton className="h-96" /></>
       ) : report.isError ? (

@@ -31,6 +31,8 @@ async function list<T>(path: string, params?: ListParams) {
 
 export const clientsApi = {
   list: (params?: ListParams) => list<Client>("/clients", params),
+  get: async (id: number) =>
+    (await apiClient.get<ApiResponse<Client>>(`/clients/${id}`)).data.data,
   create: async (payload: Record<string, unknown>) =>
     (
       await apiClient.post<ApiResponse<Client>>("/clients", payload)
@@ -46,6 +48,8 @@ export const clientsApi = {
 
 export const projectsApi = {
   list: (params?: ListParams) => list<Project>("/projects", params),
+  get: async (id: number) =>
+    (await apiClient.get<ApiResponse<Project>>(`/projects/${id}`)).data.data,
   create: async (payload: Record<string, unknown>) =>
     (
       await apiClient.post<ApiResponse<Project>>("/projects", payload)
@@ -89,6 +93,8 @@ export const projectsApi = {
 
 export const tasksApi = {
   list: (params?: ListParams) => list<Task>("/tasks", params),
+  get: async (id: number) =>
+    (await apiClient.get<ApiResponse<Task>>(`/tasks/${id}`)).data.data,
   create: async (projectId: number, payload: Record<string, unknown>) =>
     (
       await apiClient.post<ApiResponse<Task>>(

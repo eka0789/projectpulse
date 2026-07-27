@@ -22,8 +22,10 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import {
@@ -131,7 +133,11 @@ function TaskCard({
           <GripVertical className="size-4" />
         </button>
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold leading-5 text-slate-950">{task.title}</h3>
+          <h3 className="font-semibold leading-5 text-slate-950">
+            <Link href={`/tasks/${task.id}`} className="hover:underline">
+              {task.title}
+            </Link>
+          </h3>
           <p className="mt-1 truncate text-xs text-slate-500">
             {task.project?.name ?? "Project"}
           </p>
@@ -213,7 +219,6 @@ export function TasksScreen() {
   const [projectFilter, setProjectFilter] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(search);
   const queryKey = ["tasks", "kanban", debouncedSearch, projectFilter] as const;
   const tasks = useQuery({
@@ -258,7 +263,7 @@ export function TasksScreen() {
     },
     onError: (error, _variables, context) => {
       if (context?.previous) queryClient.setQueryData(queryKey, context.previous);
-      setFeedback(getApiErrorMessage(error));
+      toast.error(getApiErrorMessage(error));
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
   });
@@ -279,16 +284,17 @@ export function TasksScreen() {
       await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       setDialogOpen(false);
       setEditing(null);
-      setFeedback("Task saved successfully.");
+      toast.success("Task saved successfully.");
     },
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
   const removeTask = useMutation({
     mutationFn: tasksApi.remove,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
-      setFeedback("Task deleted successfully.");
+      toast.success("Task deleted successfully.");
     },
-    onError: (error) => setFeedback(getApiErrorMessage(error)),
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
 
   function handleDragEnd(event: DragEndEvent) {
@@ -329,7 +335,6 @@ export function TasksScreen() {
         description="Coordinate assignments and drag work between stages. Updates are optimistic and roll back if the API rejects them."
         action={<Button onClick={openCreate}><Plus className="size-4" />New task</Button>}
       />
-      {feedback ? <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900" role="status">{feedback}</div> : null}
       <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1fr_260px]">
         <label className="relative">
           <span className="sr-only">Search tasks</span>

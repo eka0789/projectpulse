@@ -11,8 +11,10 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import {
@@ -83,7 +85,6 @@ export function ProjectsScreen() {
   const [editing, setEditing] = useState<Project | null>(null);
   const [aiProject, setAiProject] = useState<Project | null>(null);
   const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
-  const [feedback, setFeedback] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(search);
   const projects = useQuery({
     queryKey: ["projects", debouncedSearch],
@@ -113,19 +114,19 @@ export function ProjectsScreen() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
-      setFeedback(editing ? "Project updated successfully." : "Project created successfully.");
+      toast.success(editing ? "Project updated successfully." : "Project created successfully.");
       setDialogOpen(false);
       setEditing(null);
     },
-    onError: (error) => setFeedback(getApiErrorMessage(error)),
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
   const removeProject = useMutation({
     mutationFn: projectsApi.remove,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
-      setFeedback("Project removed successfully.");
+      toast.success("Project removed successfully.");
     },
-    onError: (error) => setFeedback(getApiErrorMessage(error)),
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
   const generate = useMutation({
     mutationFn: async () => {
@@ -163,7 +164,7 @@ export function ProjectsScreen() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["tasks"] });
       await queryClient.invalidateQueries({ queryKey: ["projects"] });
-      setFeedback(`${suggestions.length} AI-reviewed tasks saved.`);
+      toast.success(`${suggestions.length} AI-reviewed tasks saved.`);
       setAiProject(null);
       setSuggestions([]);
     },
@@ -202,11 +203,6 @@ export function ProjectsScreen() {
           </Button>
         }
       />
-      {feedback ? (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900" role="status">
-          {feedback}
-        </div>
-      ) : null}
       <Card>
         <CardContent className="p-5">
           <label className="relative block max-w-md">
@@ -233,7 +229,11 @@ export function ProjectsScreen() {
                     <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
                       {project.client?.company ?? "Client"}
                     </p>
-                    <h2 className="mt-1 text-lg font-bold text-slate-950">{project.name}</h2>
+                    <h2 className="mt-1 text-lg font-bold text-slate-950">
+                      <Link href={`/projects/${project.id}`} className="hover:underline">
+                        {project.name}
+                      </Link>
+                    </h2>
                   </div>
                   <Badge tone={statusTone[project.status]}>{project.status.replace("_", " ")}</Badge>
                 </div>

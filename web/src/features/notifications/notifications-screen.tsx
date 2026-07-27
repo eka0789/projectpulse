@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Check, CheckCheck } from "lucide-react";
+import { toast } from "sonner";
 
 import { PageHeader, ResourceEmpty, ResourceError } from "@/components/resource-states";
 import { Button } from "@/components/ui/button";
@@ -22,13 +23,16 @@ export function NotificationsScreen() {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({ queryKey: ["notifications", "unread"] });
     },
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
   const markAll = useMutation({
     mutationFn: notificationsApi.markAllRead,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({ queryKey: ["notifications", "unread"] });
+      toast.success("All notifications marked as read.");
     },
+    onError: (error) => toast.error(getApiErrorMessage(error)),
   });
 
   return (
