@@ -30,7 +30,7 @@ class Task extends Model
         'start_date' => 'date',
         'deadline' => 'date',
         'completed_at' => 'datetime',
-        'estimated_hours' => 'float',
+        'estimated_hours' => 'decimal:2',
     ];
 
     public function project()

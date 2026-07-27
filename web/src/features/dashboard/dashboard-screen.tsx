@@ -333,7 +333,7 @@ export function DashboardScreen() {
                     </td>
                     <td className="px-5 py-4">
                       <Badge tone={projectTone[project.status]}>
-                        {project.status.replace("_", " ")}
+                        {project.status.replaceAll("_", " ")}
                       </Badge>
                     </td>
                     <td className="px-5 py-4 text-slate-600">

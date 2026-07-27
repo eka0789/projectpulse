@@ -68,7 +68,6 @@ class MemberController extends Controller
 
         $member = User::create([
             ...$data,
-            'password' => Hash::make($data['password']),
             'is_active' => true,
         ]);
 
@@ -143,7 +142,7 @@ class MemberController extends Controller
         }
 
         if ($request->filled('password')) {
-            $data['password'] = Hash::make($request->validated('password'));
+            $data['password'] = $request->validated('password');
         }
 
         $member->update($data);

@@ -20,15 +20,19 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+let isRedirecting = false;
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       clearStoredSession();
       if (
+        !isRedirecting &&
         typeof window !== "undefined" &&
         window.location.pathname !== "/login"
       ) {
+        isRedirecting = true;
         window.location.assign("/login?reason=session-expired");
       }
     }

@@ -28,7 +28,7 @@ export type Project = {
   description: string | null;
   client_brief: string | null;
   start_date: string | null;
-  deadline: string;
+  deadline: string | null;
   status: ProjectStatus;
   client?: Client;
   creator?: AuthUser;

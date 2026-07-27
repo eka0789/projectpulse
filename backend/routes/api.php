@@ -42,10 +42,10 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
         Route::apiResource('clients', ClientController::class);
         Route::apiResource('projects', ProjectController::class);
 
-        Route::get('/projects/{project}/tasks', [TaskController::class, 'index']);
-        Route::post('/projects/{project}/tasks', [TaskController::class, 'store']);
-        Route::post('/projects/{project}/tasks/generate', [TaskController::class, 'generateAISuggestions']);
-        Route::post('/projects/{project}/tasks/bulk', [TaskController::class, 'bulkStore']);
+        Route::get('/projects/{projectId}/tasks', [TaskController::class, 'index']);
+        Route::post('/projects/{projectId}/tasks', [TaskController::class, 'store']);
+        Route::post('/projects/{projectId}/tasks/generate', [TaskController::class, 'generateAISuggestions']);
+        Route::post('/projects/{projectId}/tasks/bulk', [TaskController::class, 'bulkStore']);
 
         Route::patch('/tasks/{id}', [TaskController::class, 'update']);
         Route::delete('/tasks/{id}', [TaskController::class, 'destroy']);

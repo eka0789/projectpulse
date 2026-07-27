@@ -94,7 +94,19 @@ class ProjectController extends Controller
 
     public function show(Request $request, int $id): JsonResponse
     {
+        $user = $request->user();
         $project = Project::with(['client', 'creator', 'tasks.assignee'])->findOrFail($id);
+
+        if ($user->isMember()) {
+            $hasAccess = $project->tasks->contains('assignee_id', $user->id);
+            if (! $hasAccess) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized action.',
+                    'error' => ['code' => 'FORBIDDEN', 'details' => null],
+                ], 403);
+            }
+        }
 
         return response()->json([
             'success' => true,
@@ -139,7 +151,12 @@ class ProjectController extends Controller
 
         $project = Project::findOrFail($id);
         DB::transaction(function () use ($project): void {
-            $project->tasks()->delete();
+            $project->tasks()->each(function ($task) {
+                $task->timeLogs()->delete();
+                $task->progressNotes()->delete();
+                $task->comments()->delete();
+                $task->delete();
+            });
             $project->delete();
         });
 

@@ -146,7 +146,9 @@ export function ClientDetailScreen({ initialEdit = false }: { initialEdit?: bool
         Back to clients
       </Link>
 
-      {client.isPending ? (
+      {!Number.isInteger(clientId) ? (
+        <ResourceError message="Invalid client ID." />
+      ) : client.isPending ? (
         <div className="space-y-4">
           <Skeleton className="h-28" />
           <Skeleton className="h-56" />
@@ -237,7 +239,7 @@ export function ClientDetailScreen({ initialEdit = false }: { initialEdit?: bool
                         </span>
                       </div>
                       <Badge tone={statusTone[project.status]}>
-                        {project.status.replace("_", " ")}
+                        {project.status.replaceAll("_", " ")}
                       </Badge>
                     </Link>
                   ))}

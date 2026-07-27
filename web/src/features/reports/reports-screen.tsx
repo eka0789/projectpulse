@@ -24,7 +24,7 @@ export function ReportsScreen() {
       anchor.href = url;
       anchor.download = "projectpulse-time-logs.csv";
       anchor.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast.success("Report exported successfully.");
     },
     onError: (error) => toast.error(getApiErrorMessage(error)),
@@ -37,7 +37,7 @@ export function ReportsScreen() {
       anchor.href = url;
       anchor.download = "projectpulse-time-logs.pdf";
       anchor.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast.success("PDF report exported successfully.");
     },
     onError: (error) => toast.error(getApiErrorMessage(error)),
@@ -76,7 +76,7 @@ export function ReportsScreen() {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[840px] text-left text-sm">
                   <thead className="border-y border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-5 py-3">Date</th><th className="px-5 py-3">Member</th><th className="px-5 py-3">Task</th><th className="px-5 py-3">Project</th><th className="px-5 py-3">Duration</th><th className="px-5 py-3">Note</th></tr></thead>
-                  <tbody>{report.data.time_logs.map((log) => <tr key={log.id} className="border-b border-slate-100 last:border-0"><td className="px-5 py-4 text-slate-600">{log.work_date}</td><td className="px-5 py-4 font-medium text-slate-900">{log.user?.name ?? "Unknown"}</td><td className="px-5 py-4 text-slate-700">{log.task?.title ?? "Deleted task"}</td><td className="px-5 py-4 text-slate-600">{log.task?.project?.name ?? "Deleted project"}</td><td className="px-5 py-4 font-semibold text-slate-900">{(log.duration_minutes / 60).toFixed(1)}h</td><td className="max-w-xs truncate px-5 py-4 text-slate-500">{log.note ?? "—"}</td></tr>)}</tbody>
+                  <tbody>{report.data.time_logs.map((log) => <tr key={log.id} className="border-b border-slate-100 last:border-0"><td className="px-5 py-4 text-slate-600">{log.work_date}</td><td className="px-5 py-4 font-medium text-slate-900">{log.user?.name ?? "Unknown"}</td><td className="px-5 py-4 text-slate-700">{log.task?.title ?? "Deleted task"}</td><td className="px-5 py-4 text-slate-600">{log.task?.project?.name ?? "Deleted project"}</td><td className="px-5 py-4 font-semibold text-slate-900">{((log.duration_minutes ?? 0) / 60).toFixed(1)}h</td><td className="max-w-xs truncate px-5 py-4 text-slate-500">{log.note ?? "—"}</td></tr>)}</tbody>
                 </table>
               </div>
             ) : <ResourceEmpty title="No time logs yet" description="Member time entries will appear here." />}

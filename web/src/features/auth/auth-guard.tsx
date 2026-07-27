@@ -5,9 +5,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import { useAuth } from "@/features/auth/auth-provider";
+import { Button } from "@/components/ui/button";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, isReady } = useAuth();
+  const { user, isReady, logout } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -44,6 +45,13 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
           <p className="mt-3 text-slate-600">
             Member accounts use the ProjectPulse mobile application.
           </p>
+          <Button
+            className="mt-6"
+            variant="outline"
+            onClick={() => logout()}
+          >
+            Sign out
+          </Button>
         </div>
       </main>
     );

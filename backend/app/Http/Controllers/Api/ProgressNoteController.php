@@ -52,7 +52,7 @@ class ProgressNoteController extends Controller
         $progressNote = ProgressNote::create([
             'task_id' => $task->id,
             'user_id' => $user->id,
-            'note' => $request->note,
+            'note' => $request->validated('note'),
             'status_snapshot' => $task->status,
         ]);
 
@@ -73,7 +73,7 @@ class ProgressNoteController extends Controller
 
         if ($user->isMember() && (
             $progressNote->user_id !== $user->id
-            || $progressNote->task->assignee_id !== $user->id
+            && $progressNote->task->assignee_id !== $user->id
         )) {
             return response()->json([
                 'success' => false,
@@ -100,7 +100,7 @@ class ProgressNoteController extends Controller
 
         if ($user->isMember() && (
             $progressNote->user_id !== $user->id
-            || $progressNote->task->assignee_id !== $user->id
+            && $progressNote->task->assignee_id !== $user->id
         )) {
             return response()->json([
                 'success' => false,

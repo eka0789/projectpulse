@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\TimeLog;
 use App\Support\SimplePdf;
+use App\Http\Resources\TimeLogResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -52,7 +53,7 @@ class ReportController extends Controller
             'data' => [
                 'total_hours' => round($totalMinutes / 60, 2),
                 'total_entries' => $timeLogs->count(),
-                'time_logs' => $timeLogs,
+                'time_logs' => TimeLogResource::collection($timeLogs),
             ],
             'meta' => null,
         ]);
@@ -78,6 +79,14 @@ class ReportController extends Controller
 
         if ($request->filled('user_id')) {
             $query->where('user_id', $request->user_id);
+        }
+
+        if ($request->filled('date_from')) {
+            $query->where('work_date', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->where('work_date', '<=', $request->date_to);
         }
 
         $timeLogs = $query->orderBy('work_date', 'desc')->get();

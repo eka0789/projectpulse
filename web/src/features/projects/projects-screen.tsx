@@ -231,7 +231,7 @@ export function ProjectsScreen() {
                       </Link>
                     </h2>
                   </div>
-                  <Badge tone={statusTone[project.status]}>{project.status.replace("_", " ")}</Badge>
+                  <Badge tone={statusTone[project.status]}>{project.status.replaceAll("_", " ")}</Badge>
                 </div>
                 <p className="mt-3 line-clamp-3 min-h-15 text-sm leading-5 text-slate-600">
                   {project.description || "No project description yet."}

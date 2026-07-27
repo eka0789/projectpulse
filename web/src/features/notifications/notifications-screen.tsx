@@ -19,17 +19,17 @@ export function NotificationsScreen() {
   });
   const markRead = useMutation({
     mutationFn: notificationsApi.markRead,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["notifications", "unread"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      await queryClient.invalidateQueries({ queryKey: ["notifications", "unread"] });
     },
     onError: (error) => toast.error(getApiErrorMessage(error)),
   });
   const markAll = useMutation({
     mutationFn: notificationsApi.markAllRead,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["notifications", "unread"] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      await queryClient.invalidateQueries({ queryKey: ["notifications", "unread"] });
       toast.success("All notifications marked as read.");
     },
     onError: (error) => toast.error(getApiErrorMessage(error)),

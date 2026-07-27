@@ -20,7 +20,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
@@ -28,8 +28,8 @@ export function LoginForm() {
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "admin@projectpulse.test",
-      password: "password",
+      email: "",
+      password: "",
     },
   });
 
@@ -39,6 +39,7 @@ export function LoginForm() {
     try {
       const user = await login(values);
       if (user.role !== "admin") {
+        await logout();
         setSubmitError(
           "This account is a member account. Please use the mobile app.",
         );

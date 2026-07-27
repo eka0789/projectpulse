@@ -1,4 +1,4 @@
-export type TaskStatus = "todo" | "in_progress" | "review" | "done";
+import type { ProjectStatus, TaskStatus } from "@/types/resources";
 
 export type MemberWorkload = {
   user_id: number;
@@ -16,7 +16,7 @@ export type RecentProject = {
   name: string;
   client_name: string;
   company: string;
-  status: "draft" | "active" | "on_hold" | "completed" | "cancelled";
+  status: ProjectStatus;
   deadline: string | null;
   task_count: number;
 };

@@ -162,7 +162,9 @@ export function TaskDetailScreen({ initialEdit = false }: { initialEdit?: boolea
         Back to tasks
       </Link>
 
-      {task.isPending ? (
+      {!Number.isInteger(taskId) ? (
+        <ResourceError message="Invalid task ID." />
+      ) : task.isPending ? (
         <div className="space-y-4">
           <Skeleton className="h-28" />
           <Skeleton className="h-56" />
@@ -207,7 +209,7 @@ export function TaskDetailScreen({ initialEdit = false }: { initialEdit?: boolea
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Status
                 </p>
-                <p className="mt-1 capitalize">{task.data.status.replace("_", " ")}</p>
+                <p className="mt-1 capitalize">{task.data.status.replaceAll("_", " ")}</p>
               </div>
               <div className="text-sm text-slate-700">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">

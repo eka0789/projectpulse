@@ -167,7 +167,9 @@ export function ProjectDetailScreen({ initialEdit = false }: { initialEdit?: boo
         Back to projects
       </Link>
 
-      {project.isPending ? (
+      {!Number.isInteger(projectId) ? (
+        <ResourceError message="Invalid project ID." />
+      ) : project.isPending ? (
         <div className="space-y-4">
           <Skeleton className="h-28" />
           <Skeleton className="h-56" />
@@ -214,7 +216,7 @@ export function ProjectDetailScreen({ initialEdit = false }: { initialEdit?: boo
               </div>
               <div className="flex items-center gap-3 text-sm text-slate-700">
                 <Badge tone={statusTone[project.data.status]}>
-                  {project.data.status.replace("_", " ")}
+                  {project.data.status.replaceAll("_", " ")}
                 </Badge>
               </div>
               {project.data.client_brief ? (

@@ -5,6 +5,7 @@
 import {
   DndContext,
   PointerSensor,
+  closestCorners,
   type DragEndEvent,
   useDraggable,
   useDroppable,
@@ -212,11 +213,11 @@ function KanbanColumn({
   );
 }
 
-export function TasksScreen() {
+export function TasksScreen({ projectId }: { projectId?: string } = {}) {
   const queryClient = useQueryClient();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [search, setSearch] = useState("");
-  const [projectFilter, setProjectFilter] = useState(0);
+  const [projectFilter, setProjectFilter] = useState(projectId ? Number(projectId) : 0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Task | null>(null);
   const debouncedSearch = useDebouncedValue(search);
@@ -352,7 +353,7 @@ export function TasksScreen() {
       ) : tasks.isError ? (
         <ResourceError message={getApiErrorMessage(tasks.error)} onRetry={() => tasks.refetch()} />
       ) : (
-        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {statuses.map((column) => (
               <KanbanColumn

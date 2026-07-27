@@ -26,8 +26,8 @@ export function LoginPage() {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      email: "member@projectpulse.test",
-      password: "password",
+      email: "",
+      password: "",
     },
   });
 

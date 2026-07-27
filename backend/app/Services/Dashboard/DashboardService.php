@@ -27,6 +27,7 @@ class DashboardService
             ->where('deadline', '=', $today);
 
         $tasksDueThisWeekQuery = Task::where('status', '!=', 'done')
+            ->where('deadline', '!=', $today)
             ->whereBetween('deadline', [$today, $endOfWeek]);
 
         if ($user && $user->isMember()) {
@@ -37,6 +38,7 @@ class DashboardService
 
         $taskCounts = Task::query()
             ->select('status', DB::raw('COUNT(*) as aggregate'))
+            ->when($user && $user->isMember(), fn ($q) => $q->where('assignee_id', $user->id))
             ->groupBy('status')
             ->pluck('aggregate', 'status');
         $taskDistribution = collect(['todo', 'in_progress', 'review', 'done'])
@@ -86,8 +88,8 @@ class DashboardService
                 return [
                     'id' => $project->id,
                     'name' => $project->name,
-                    'client_name' => $project->client->name ?? 'N/A',
-                    'company' => $project->client->company ?? 'N/A',
+                    'client_name' => $project->client?->name ?? 'N/A',
+                    'company' => $project->client?->company ?? 'N/A',
                     'status' => $project->status,
                     'deadline' => $project->deadline ? $project->deadline->format('Y-m-d') : null,
                     'task_count' => $project->tasks_count,

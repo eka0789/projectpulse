@@ -112,6 +112,7 @@ export function TaskDetailPage() {
       });
       setToast("Time entry added.");
     },
+    onError: (error) => setToast(errorMessage(error)),
   });
   const noteMutation = useMutation({
     mutationFn: (values: NoteValues) => addProgressNote(taskId, values.note),
@@ -121,6 +122,7 @@ export function TaskDetailPage() {
       noteForm.reset();
       setToast("Progress note added.");
     },
+    onError: (error) => setToast(errorMessage(error)),
   });
 
   return (

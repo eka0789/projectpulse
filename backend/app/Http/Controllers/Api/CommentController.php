@@ -54,7 +54,7 @@ class CommentController extends Controller
         $comment = TaskComment::create([
             'task_id' => $task->id,
             'user_id' => $user->id,
-            'body' => $request->body,
+            'body' => $request->validated('body'),
         ]);
 
         // Trigger notification if commenter is not assignee
@@ -84,8 +84,9 @@ class CommentController extends Controller
         $comment = TaskComment::with('task')->findOrFail($id);
         $user = $request->user();
 
-        if ($comment->user_id !== $user->id || (
-            $user->isMember() && $comment->task->assignee_id !== $user->id
+        if ($user->isMember() && (
+            $comment->user_id !== $user->id
+            || $comment->task->assignee_id !== $user->id
         )) {
             return response()->json([
                 'success' => false,
@@ -113,8 +114,9 @@ class CommentController extends Controller
         $comment = TaskComment::with('task')->findOrFail($id);
         $user = $request->user();
 
-        if ($comment->user_id !== $user->id || (
-            $user->isMember() && $comment->task->assignee_id !== $user->id
+        if ($user->isMember() && (
+            $comment->user_id !== $user->id
+            || $comment->task->assignee_id !== $user->id
         )) {
             return response()->json([
                 'success' => false,

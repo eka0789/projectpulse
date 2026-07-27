@@ -28,11 +28,17 @@ class TaskController extends Controller
         private readonly TaskBreakdownService $taskBreakdownService
     ) {}
 
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ?int $projectId = null): JsonResponse
     {
         $user = $request->user();
         $query = Task::with(['project.client', 'assignee', 'creator'])
             ->withSum('timeLogs as total_logged_minutes', 'duration_minutes');
+
+        if ($projectId) {
+            $query->where('project_id', $projectId);
+        } elseif ($request->filled('project_id')) {
+            $query->where('project_id', $request->project_id);
+        }
 
         if ($user->isMember()) {
             $query->where('assignee_id', $user->id);
@@ -220,7 +226,7 @@ class TaskController extends Controller
         }
         $task->save();
 
-        if ($task->assignee_id) {
+        if ($task->assignee_id && $task->assignee_id !== $user->id) {
             StoreInAppNotification::dispatchSync($task->assignee_id, new TaskEventNotification(
                 eventType: 'TaskStatusUpdated',
                 title: 'Task Status Changed',

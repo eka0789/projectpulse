@@ -41,7 +41,7 @@ class TimeLogController extends Controller
         $task = Task::findOrFail($taskId);
         $user = $request->user();
 
-        if ($task->assignee_id !== $user->id) {
+        if ($user->isMember() && $task->assignee_id !== $user->id) {
             return response()->json([
                 'success' => false,
                 'message' => 'Time can only be logged by the assigned member.',
