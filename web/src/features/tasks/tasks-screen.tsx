@@ -244,8 +244,8 @@ export function TasksScreen() {
   });
 
   const moveTask = useMutation({
-    mutationFn: ({ id, status }: { id: number; status: TaskStatus }) =>
-      tasksApi.updateStatus(id, status),
+    mutationFn: ({ id, status, updatedAt }: { id: number; status: TaskStatus; updatedAt: string }) =>
+      tasksApi.updateStatus(id, status, updatedAt),
     onMutate: async ({ id, status }) => {
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<PaginatedResponse<Task>>(queryKey);
@@ -276,7 +276,7 @@ export function TasksScreen() {
         deadline: values.deadline || null,
       };
       return editing
-        ? tasksApi.update(editing.id, payload)
+        ? tasksApi.update(editing.id, { ...payload, updated_at: editing.updated_at })
         : tasksApi.create(values.project_id, payload);
     },
     onSuccess: async () => {
@@ -301,7 +301,7 @@ export function TasksScreen() {
     const task = event.active.data.current?.task as Task | undefined;
     const status = event.over?.id as TaskStatus | undefined;
     if (task && status && statuses.some((item) => item.value === status) && task.status !== status) {
-      moveTask.mutate({ id: task.id, status });
+      moveTask.mutate({ id: task.id, status, updatedAt: task.updated_at });
     }
   }
 

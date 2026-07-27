@@ -78,9 +78,9 @@ export async function taskDetail(id: number): Promise<Task> {
   return (await api.get<ApiResponse<Task>>(`/tasks/${id}`)).data.data;
 }
 
-export async function updateTaskStatus(id: number, status: TaskStatus): Promise<Task> {
+export async function updateTaskStatus(id: number, status: TaskStatus, updatedAt: string): Promise<Task> {
   return (
-    await api.patch<ApiResponse<Task>>(`/tasks/${id}/status`, { status })
+    await api.patch<ApiResponse<Task>>(`/tasks/${id}/status`, { status, updated_at: updatedAt })
   ).data.data;
 }
 
@@ -116,4 +116,3 @@ export async function markNotificationRead(id: string): Promise<void> {
 export async function markAllNotificationsRead(): Promise<void> {
   await api.patch("/notifications/read-all");
 }
-

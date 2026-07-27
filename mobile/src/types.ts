@@ -50,6 +50,7 @@ export type Task = {
   assignee?: User;
   time_logs?: TimeLog[];
   progress_notes?: ProgressNote[];
+  updated_at: string;
 };
 
 export type Notification = {
@@ -80,4 +81,3 @@ export type Session = {
   token: string;
   user: User;
 };
-

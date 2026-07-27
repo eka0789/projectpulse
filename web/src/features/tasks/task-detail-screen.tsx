@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -68,12 +68,13 @@ const priorityTone: Record<TaskPriority, "slate" | "blue" | "amber" | "red"> = {
   urgent: "red",
 };
 
-export function TaskDetailScreen() {
+export function TaskDetailScreen({ initialEdit = false }: { initialEdit?: boolean }) {
   const params = useParams<{ id: string }>();
   const taskId = Number(params?.id);
   const router = useRouter();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const openedInitial = useRef(false);
 
   const task = useQuery({
     queryKey: ["tasks", taskId],
@@ -103,6 +104,7 @@ export function TaskDetailScreen() {
     mutationFn: (values: TaskForm) =>
       tasksApi.update(taskId, {
         ...values,
+        updated_at: task.data?.updated_at,
         assignee_id: values.assignee_id || null,
         description: values.description || null,
         deadline: values.deadline || null,
@@ -140,6 +142,15 @@ export function TaskDetailScreen() {
     });
     setDialogOpen(true);
   }
+
+  useEffect(() => {
+    if (initialEdit && task.data && !openedInitial.current) {
+      openedInitial.current = true;
+      openEdit();
+    }
+    // openEdit intentionally runs once when the requested resource arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialEdit, task.data]);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">

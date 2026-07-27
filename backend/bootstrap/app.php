@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\StaleModelException;
 use App\Http\Middleware\AddRequestId;
 use App\Http\Middleware\AdminOnly;
 use App\Http\Middleware\EnsureUserIsActive;
@@ -96,6 +97,24 @@ return Application::configure(basePath: dirname(__DIR__))
                 'message' => 'Too many requests. Please try again later.',
                 'error' => ['code' => 'RATE_LIMIT_EXCEEDED', 'details' => null],
             ], Response::HTTP_TOO_MANY_REQUESTS);
+        });
+
+        $exceptions->render(function (StaleModelException $exception, Request $request): ?JsonResponse {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage(),
+                'error' => [
+                    'code' => 'STALE_RESOURCE',
+                    'details' => [
+                        'resource' => $exception->resource,
+                        'id' => $exception->resourceId,
+                    ],
+                ],
+            ], Response::HTTP_CONFLICT);
         });
 
         $exceptions->render(function (Throwable $exception, Request $request): ?JsonResponse {

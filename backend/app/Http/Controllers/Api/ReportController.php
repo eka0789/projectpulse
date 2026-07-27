@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\TimeLog;
+use App\Support\SimplePdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
@@ -107,5 +109,56 @@ class ReportController extends Controller
 
             fclose($file);
         }, 200, $headers);
+    }
+
+    public function exportPdf(Request $request): Response|JsonResponse
+    {
+        if (! $request->user()->isAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized action.',
+                'error' => ['code' => 'FORBIDDEN', 'details' => null],
+            ], 403);
+        }
+
+        $query = TimeLog::with(['task.project.client', 'user']);
+
+        if ($request->filled('project_id')) {
+            $query->whereHas('task', fn ($taskQuery) => $taskQuery->where('project_id', $request->project_id));
+        }
+        if ($request->filled('user_id')) {
+            $query->where('user_id', $request->user_id);
+        }
+        if ($request->filled('date_from')) {
+            $query->where('work_date', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->where('work_date', '<=', $request->date_to);
+        }
+
+        $timeLogs = $query->orderBy('work_date', 'desc')->get();
+        $lines = [
+            'ProjectPulse - Time Log Report',
+            'Generated: '.now()->toDateTimeString(),
+            'Entries: '.$timeLogs->count().' | Total hours: '.number_format($timeLogs->sum('duration_minutes') / 60, 2),
+            str_repeat('-', 96),
+            'Date | Member | Project | Task | Hours',
+        ];
+
+        foreach ($timeLogs as $log) {
+            $lines[] = implode(' | ', [
+                $log->work_date->format('Y-m-d'),
+                $log->user->name ?? 'N/A',
+                $log->task->project->name ?? 'N/A',
+                $log->task->title ?? 'N/A',
+                number_format($log->duration_minutes / 60, 2),
+            ]);
+        }
+
+        return response(SimplePdf::fromLines($lines), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="time_logs_report.pdf"',
+            'Cache-Control' => 'private, no-store',
+        ]);
     }
 }

@@ -230,6 +230,15 @@ Import either the OpenAPI file or both Postman JSON files. The login request sto
 - [Technical decisions](docs/technical-decisions.md)
 - [Final audit](docs/final-audit.md)
 
+The admin workspace includes dedicated client/project/task detail and edit routes, a four-step AI-assisted project wizard, breadcrumb navigation, toast feedback, settings visibility, and CSV/PDF reporting. The member app includes task workflows, notification deep links, profile details, and logout.
+
+## Future improvements
+
+- Add Playwright browser journeys and native device UI automation beyond the current PHPUnit/Vitest coverage.
+- Move browser/mobile bearer tokens to a same-origin HttpOnly-cookie BFF and hardware-backed mobile secure storage.
+- Add visual regression screenshots for the responsive admin and mobile flows.
+- Replace the dependency-free PDF renderer with a branded template engine when richer typography and charts are required.
+
 ## Security notes and deliberate trade-offs
 
 - Authorization is enforced on the API; the web/mobile visibility rules are not security boundaries.

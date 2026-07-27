@@ -513,6 +513,17 @@ paths:
           content:
             text/csv:
               schema: { type: string }
+  /reports/time-logs/export.pdf:
+    get:
+      tags: [Reports]
+      security: [{ bearerAuth: [] }]
+      summary: Export authorized time logs as PDF
+      responses:
+        "200":
+          description: PDF file
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
 components:
   securitySchemes:
     bearerAuth:

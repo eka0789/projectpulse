@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -77,12 +77,13 @@ const taskStatusLabel: Record<TaskStatus, string> = {
   done: "Done",
 };
 
-export function ProjectDetailScreen() {
+export function ProjectDetailScreen({ initialEdit = false }: { initialEdit?: boolean }) {
   const params = useParams<{ id: string }>();
   const projectId = Number(params?.id);
   const router = useRouter();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const openedInitial = useRef(false);
 
   const project = useQuery({
     queryKey: ["projects", projectId],
@@ -146,6 +147,15 @@ export function ProjectDetailScreen() {
     });
     setDialogOpen(true);
   }
+
+  useEffect(() => {
+    if (initialEdit && project.data && !openedInitial.current) {
+      openedInitial.current = true;
+      openEdit();
+    }
+    // openEdit intentionally runs once when the requested resource arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialEdit, project.data]);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">

@@ -25,6 +25,7 @@ class UpdateTaskRequest extends StoreTaskRequest
             'estimated_hours' => ['sometimes', 'nullable', 'numeric', 'min:0.1', 'max:500'],
             'start_date' => ['sometimes', 'nullable', 'date'],
             'deadline' => ['sometimes', 'nullable', 'date', 'after_or_equal:start_date'],
+            'updated_at' => ['sometimes', 'required', 'date'],
         ];
     }
 }

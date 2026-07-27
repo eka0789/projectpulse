@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\TaskStatus;
+use App\Exceptions\StaleModelException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AI\GenerateTaskBreakdownRequest;
 use App\Http\Requests\Task\BulkStoreTasksRequest;
@@ -10,16 +11,16 @@ use App\Http\Requests\Task\StoreTaskRequest;
 use App\Http\Requests\Task\UpdateTaskRequest;
 use App\Http\Requests\Task\UpdateTaskStatusRequest;
 use App\Http\Resources\TaskResource;
-use App\Models\Notification;
+use App\Jobs\StoreInAppNotification;
 use App\Models\Project;
 use App\Models\Task;
+use App\Notifications\TaskEventNotification;
 use App\Services\AI\TaskBreakdownRequestData;
 use App\Services\AI\TaskBreakdownService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class TaskController extends Controller
 {
@@ -165,8 +166,9 @@ class TaskController extends Controller
 
         $task = Task::findOrFail($id);
         $oldAssigneeId = $task->assignee_id;
+        $this->ensureFresh($task, $request->validated('updated_at'));
 
-        $task->update($request->validated());
+        $task->update($request->safe()->except('updated_at'));
 
         if ($request->filled('assignee_id') && $request->assignee_id !== $oldAssigneeId) {
             $this->createAssignmentNotification($task, $request->assignee_id);
@@ -186,6 +188,7 @@ class TaskController extends Controller
     {
         $user = $request->user();
         $task = Task::findOrFail($id);
+        $this->ensureFresh($task, $request->validated('updated_at'));
 
         if ($user->isMember() && $task->assignee_id !== $user->id) {
             return response()->json([
@@ -218,14 +221,12 @@ class TaskController extends Controller
         $task->save();
 
         if ($task->assignee_id) {
-            Notification::create([
-                'id' => (string) Str::uuid(),
-                'user_id' => $task->assignee_id,
-                'type' => 'TaskStatusUpdated',
-                'title' => 'Task Status Changed',
-                'message' => "Task '{$task->title}' status updated to {$targetStatus->value}.",
-                'data' => ['task_id' => $task->id, 'status' => $targetStatus->value],
-            ]);
+            StoreInAppNotification::dispatchSync($task->assignee_id, new TaskEventNotification(
+                eventType: 'TaskStatusUpdated',
+                title: 'Task Status Changed',
+                message: "Task '{$task->title}' status updated to {$targetStatus->value}.",
+                data: ['task_id' => $task->id, 'status' => $targetStatus->value],
+            ));
         }
 
         return response()->json([
@@ -357,13 +358,18 @@ class TaskController extends Controller
 
     private function createAssignmentNotification(Task $task, int $assigneeId): void
     {
-        Notification::create([
-            'id' => (string) Str::uuid(),
-            'user_id' => $assigneeId,
-            'type' => 'TaskAssigned',
-            'title' => 'New Task Assigned',
-            'message' => "You have been assigned to task: '{$task->title}'",
-            'data' => ['task_id' => $task->id, 'project_id' => $task->project_id],
-        ]);
+        StoreInAppNotification::dispatchSync($assigneeId, new TaskEventNotification(
+            eventType: 'TaskAssigned',
+            title: 'New Task Assigned',
+            message: "You have been assigned to task: '{$task->title}'",
+            data: ['task_id' => $task->id, 'project_id' => $task->project_id],
+        ));
+    }
+
+    private function ensureFresh(Task $task, ?string $expectedUpdatedAt): void
+    {
+        if ($expectedUpdatedAt !== null && ! $task->updated_at->equalTo(Carbon::parse($expectedUpdatedAt))) {
+            throw new StaleModelException('task', $task->id);
+        }
     }
 }

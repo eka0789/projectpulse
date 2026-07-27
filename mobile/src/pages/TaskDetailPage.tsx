@@ -85,7 +85,10 @@ export function TaskDetailPage() {
   }
 
   const statusMutation = useMutation({
-    mutationFn: (status: TaskStatus) => updateTaskStatus(taskId, status),
+    mutationFn: (status: TaskStatus) => {
+      if (!task.data) throw new Error("Task data is not available.");
+      return updateTaskStatus(taskId, status, task.data.updated_at);
+    },
     onSuccess: (_data, status) => {
       refreshTask();
       setToast(`Task moved to ${status.replace("_", " ")}.`);
@@ -192,4 +195,3 @@ export function TaskDetailPage() {
     </IonPage>
   );
 }
-

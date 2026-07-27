@@ -106,10 +106,11 @@ export const tasksApi = {
     (
       await apiClient.patch<ApiResponse<Task>>(`/tasks/${id}`, payload)
     ).data.data,
-  updateStatus: async (id: number, status: TaskStatus) =>
+  updateStatus: async (id: number, status: TaskStatus, updatedAt: string) =>
     (
       await apiClient.patch<ApiResponse<Task>>(`/tasks/${id}/status`, {
         status,
+        updated_at: updatedAt,
       })
     ).data.data,
   remove: async (id: number) => {
@@ -140,6 +141,12 @@ export const reportsApi = {
   exportCsv: async () =>
     (
       await apiClient.get<Blob>("/reports/time-logs/export.csv", {
+        responseType: "blob",
+      })
+    ).data,
+  exportPdf: async () =>
+    (
+      await apiClient.get<Blob>("/reports/time-logs/export.pdf", {
         responseType: "blob",
       })
     ).data,

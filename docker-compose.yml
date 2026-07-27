@@ -16,6 +16,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - data
 
   backend:
     build:
@@ -45,6 +47,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+    networks:
+      - app
+      - data
 
   queue:
     build:
@@ -69,6 +74,9 @@ services:
         condition: service_healthy
       backend:
         condition: service_healthy
+    networks:
+      - app
+      - data
 
   scheduler:
     build:
@@ -93,6 +101,9 @@ services:
         condition: service_healthy
       backend:
         condition: service_healthy
+    networks:
+      - app
+      - data
 
   web:
     build:
@@ -107,6 +118,15 @@ services:
         condition: service_healthy
     ports:
       - "3000:3000"
+    networks:
+      - app
 
 volumes:
   postgres_data:
+
+networks:
+  app:
+    name: projectpulse_app
+  data:
+    name: projectpulse_data
+    internal: true

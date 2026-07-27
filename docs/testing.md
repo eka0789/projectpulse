@@ -15,6 +15,7 @@ The PHPUnit suite uses an in-memory SQLite database and real Laravel HTTP routin
 - OpenAI/Gemini demo fallback, invalid provider payloads, audit rows, and transactional bulk validation;
 - task-breakdown normalization bounds;
 - H-1 deadline notification idempotency.
+- stale task-write conflict detection, model factory graphs, and secured PDF reporting.
 
 Run:
 
@@ -31,23 +32,27 @@ The web has strict TypeScript through the Next.js production compiler and ESLint
 ```bash
 cd web
 npm run lint
+npm run typecheck
+npm test
 npm run build
 ```
 
-Component/unit browser tests are not currently included; this is recorded as a limitation rather than represented as completed coverage.
+Vitest covers extracted schemas and other deterministic client logic. Full browser-level interaction coverage remains a future improvement.
 
 ## Mobile verification
 
 ```bash
 cd mobile
 npm run lint
+npm run typecheck
+npm test
 npm run build
 npx cap sync android
 cd android
 gradlew.bat assembleDebug
 ```
 
-The native build requires JDK 21 and an installed Android SDK. Device-level UI automation is not included.
+Vitest covers notification deep-link parsing. The native build requires JDK 21 and an installed Android SDK; device-level UI automation is not included.
 
 ## Infrastructure verification
 

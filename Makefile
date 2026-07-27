@@ -32,10 +32,10 @@ test-backend:
 	cd backend && php artisan test
 
 test-web:
-	cd web && npm run lint && npm run build
+	cd web && npm run lint && npm run typecheck && npm test && npm run build
 
 test-mobile:
-	cd mobile && npm run lint && npm run build
+	cd mobile && npm run lint && npm run typecheck && npm test && npm run build
 
 lint:
 	cd backend && ./vendor/bin/pint --test

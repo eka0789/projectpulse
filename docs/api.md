@@ -108,4 +108,5 @@
 - `GET /api/reports/time-logs` — Detailed report on time logs filtered by project, user, date range.
 - `GET /api/reports/time-logs/export.csv` — CSV export of time log report.
 - `GET /api/reports/time-logs/export.pdf` — PDF export of time log report.
+- `GET /api/reports/time-logs/export.pdf` — PDF export of time log report.
 - `GET /api/health` & `GET /api/health/ready` — Liveness & Readiness health check endpoints.

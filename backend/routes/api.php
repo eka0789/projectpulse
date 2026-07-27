@@ -52,6 +52,7 @@ Route::middleware(['auth:sanctum', 'active', 'throttle:60,1'])->group(function (
 
         Route::get('/reports/time-logs', [ReportController::class, 'timeLogs']);
         Route::get('/reports/time-logs/export.csv', [ReportController::class, 'exportCsv']);
+        Route::get('/reports/time-logs/export.pdf', [ReportController::class, 'exportPdf']);
     });
 
     // Tasks are scoped by TaskController for member accounts.

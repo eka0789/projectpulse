@@ -51,11 +51,11 @@ const emptyForm: ClientForm = {
   notes: "",
 };
 
-export function ClientsScreen() {
+export function ClientsScreen({ initialCreate = false }: { initialCreate?: boolean }) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(initialCreate);
   const [editing, setEditing] = useState<Client | null>(null);
   const debouncedSearch = useDebouncedValue(search);
   const clients = useQuery({

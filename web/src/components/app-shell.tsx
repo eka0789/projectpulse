@@ -10,6 +10,7 @@ import {
   LayoutList,
   LogOut,
   Menu,
+  Settings,
   Users,
   X,
 } from "lucide-react";
@@ -19,6 +20,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import { useAuth } from "@/features/auth/auth-provider";
 import { cn } from "@/lib/utils";
 import { notificationsApi } from "@/services/resource-service";
@@ -30,6 +32,7 @@ const navigation = [
   { label: "Clients", href: "/clients", icon: BriefcaseBusiness },
   { label: "Team", href: "/members", icon: Users },
   { label: "Time reports", href: "/reports", icon: Clock3 },
+  { label: "Settings", href: "/settings", icon: Settings },
 ];
 
 function Brand() {
@@ -197,6 +200,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ) : null}
           </Link>
         </header>
+        <Breadcrumbs />
         <main className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
       </div>
     </div>

@@ -15,6 +15,7 @@ class UpdateTaskStatusRequest extends FormRequest
     {
         return [
             'status' => ['required', 'in:todo,in_progress,review,done'],
+            'updated_at' => ['sometimes', 'required', 'date'],
         ];
     }
 }

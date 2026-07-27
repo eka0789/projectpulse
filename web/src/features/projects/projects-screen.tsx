@@ -170,12 +170,6 @@ export function ProjectsScreen() {
     },
   });
 
-  function openCreate() {
-    setEditing(null);
-    form.reset(emptyForm);
-    setDialogOpen(true);
-  }
-
   function openEdit(project: Project) {
     setEditing(project);
     form.reset({
@@ -197,10 +191,12 @@ export function ProjectsScreen() {
         title="Projects"
         description="Plan client engagements, manage deadlines, and review AI-assisted task breakdowns before saving."
         action={
-          <Button onClick={openCreate}>
-            <Plus className="size-4" />
-            New project
-          </Button>
+          <Link
+            href="/projects/new"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2"
+          >
+            <Plus className="size-4" />New project
+          </Link>
         }
       />
       <Card>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Clock3, Download, FileSpreadsheet, LoaderCircle } from "lucide-react";
+import { Clock3, Download, FileSpreadsheet, FileText, LoaderCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader, ResourceEmpty, ResourceError } from "@/components/resource-states";
@@ -29,6 +29,19 @@ export function ReportsScreen() {
     },
     onError: (error) => toast.error(getApiErrorMessage(error)),
   });
+  const downloadPdf = useMutation({
+    mutationFn: reportsApi.exportPdf,
+    onSuccess: (blob) => {
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "projectpulse-time-logs.pdf";
+      anchor.click();
+      URL.revokeObjectURL(url);
+      toast.success("PDF report exported successfully.");
+    },
+    onError: (error) => toast.error(getApiErrorMessage(error)),
+  });
 
   return (
     <div className="mx-auto max-w-[1480px] space-y-6">
@@ -37,10 +50,14 @@ export function ReportsScreen() {
         title="Time reports"
         description="Review recorded effort across projects and export the current report as a secured CSV download."
         action={
-          <Button onClick={() => download.mutate()} disabled={download.isPending}>
-            {download.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}
-            Export CSV
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => downloadPdf.mutate()} disabled={downloadPdf.isPending}>
+              {downloadPdf.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <FileText className="size-4" />}PDF
+            </Button>
+            <Button onClick={() => download.mutate()} disabled={download.isPending}>
+              {download.isPending ? <LoaderCircle className="size-4 animate-spin" /> : <Download className="size-4" />}CSV
+            </Button>
+          </div>
         }
       />
       {report.isPending ? (
